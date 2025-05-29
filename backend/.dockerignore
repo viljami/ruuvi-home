@@ -1,0 +1,118 @@
+# Backend .dockerignore - Optimize Rust build context
+
+# Rust build artifacts
+target/
+**/target/
+.cargo/
+Cargo.lock
+
+# Rust development files
+rustfmt.toml
+clippy.toml
+.rustfmt.toml
+.clippy.toml
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-workspace
+.sublime-project
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Logs
+logs/
+*.log
+log/
+*.log.*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Test artifacts
+.coverage
+coverage/
+.pytest_cache/
+test-results/
+test-reports/
+
+# Development environment
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Cache directories
+.cache/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+backup/
+backups/
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Lock files and package managers
+package-lock.json
+yarn.lock
+
+# Development tools
+.editorconfig
+.pre-commit-config.yaml
+
+# Measurement and profiling
+measure/
+perf.data*
+flamegraph.svg
+
+# Docker files (when building in context)
+Dockerfile*
+docker-compose*
+.dockerignore

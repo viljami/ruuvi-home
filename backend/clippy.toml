@@ -1,0 +1,35 @@
+# Clippy configuration for strict code quality standards
+# This file configures thresholds and limits for clippy lints
+
+# Cognitive complexity threshold - lower than default (25) for better readability
+cognitive-complexity-threshold = 15
+
+# Type complexity threshold - lower than default (250) for simpler types
+type-complexity-threshold = 100
+
+# Maximum lines in a function - lower than default (100) for better maintainability
+too-many-lines-threshold = 60
+
+# Maximum arguments in a function - lower than default (7) for better API design
+too-many-arguments-threshold = 5
+
+# Trivial copy size limit - smaller than default (128) bytes for performance
+trivial-copy-size-limit = 64
+
+# Single character binding names threshold - 0 means no single char names allowed
+# Exception: common iterator variables like 'i' are still allowed in specific contexts
+single-char-binding-names-threshold = 0
+
+# Literal representation threshold for large numbers
+literal-representation-threshold = 10000
+
+# Maximum number of lines for lambda expressions
+max-fn-params-bools = 2
+
+# Enforce documentation for public items
+# missing-docs-in-crate-items = true
+
+# Arithmetic operation checks
+arithmetic-side-effects-allowed = []
+arithmetic-side-effects-allowed-binary = []
+arithmetic-side-effects-allowed-unary = []

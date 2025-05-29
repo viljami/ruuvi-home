@@ -1,0 +1,76 @@
+# Rustfmt configuration for consistent code formatting
+# This enforces strict formatting standards across the entire codebase
+
+# Edition and basic settings
+edition = "2021"
+style_edition = "2021"
+
+# Line length and wrapping
+max_width = 100
+hard_tabs = false
+tab_spaces = 4
+
+# Import organization
+imports_granularity = "Crate"
+imports_layout = "Vertical"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+reorder_modules = true
+
+# Function and method formatting
+fn_params_layout = "Tall"
+fn_single_line = false
+brace_style = "SameLineWhere"
+control_brace_style = "AlwaysSameLine"
+
+# Where clause formatting
+where_single_line = false
+indent_style = "Block"
+
+# String and array formatting
+format_strings = true
+format_macro_matchers = true
+hex_literal_case = "Preserve"
+
+# Comment formatting
+comment_width = 80
+wrap_comments = true
+format_code_in_doc_comments = true
+doc_comment_code_block_width = 80
+
+# Whitespace and newlines
+newline_style = "Unix"
+normalize_comments = true
+normalize_doc_attributes = true
+remove_nested_parens = true
+spaces_around_ranges = false
+trailing_comma = "Vertical"
+trailing_semicolon = true
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Advanced formatting options
+chain_width = 60
+single_line_if_else_max_width = 50
+match_arm_blocks = true
+match_block_trailing_comma = false
+merge_derives = true
+overflow_delimited_expr = false
+struct_lit_single_line = true
+struct_variant_width = 35
+array_width = 60
+attr_fn_like_width = 70
+condense_wildcard_suffixes = false
+empty_item_single_line = true
+enum_discrim_align_threshold = 0
+force_explicit_abi = true
+force_multiline_blocks = false
+format_generated_files = true
+show_parse_errors = true
+ignore = []
+
+short_array_element_width_threshold = 10
+skip_children = false
+struct_field_align_threshold = 0
+unstable_features = false
+use_small_heuristics = "Default"

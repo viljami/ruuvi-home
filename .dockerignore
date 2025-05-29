@@ -1,0 +1,189 @@
+# Root .dockerignore - Exclude large/unnecessary files from Docker build context
+
+# Version control
+.git
+.gitignore
+.gitattributes
+.gitmodules
+
+# Documentation (unless needed for specific builds)
+README.md
+CHANGELOG.md
+LICENSE
+docs/
+*.md
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Python artifacts
+venv/
+env/
+.env/
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Node.js artifacts
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Frontend build artifacts
+frontend/build/
+frontend/dist/
+frontend/.next/
+frontend/out/
+frontend/.nuxt/
+frontend/.vuepress/dist/
+frontend/.cache/
+frontend/.parcel-cache/
+
+# Rust artifacts
+backend/target/
+**/target/
+Cargo.lock
+.cargo/
+
+# Logs
+logs/
+*.log
+log/
+*.log.*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+.lock-wscript
+
+# Coverage directory used by tools like istanbul
+coverage/
+.nyc_output/
+
+# Dependency directories
+jspm_packages/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# dotenv environment variables file
+.env
+.env.test
+.env.production
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary folders
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+test-results/
+test-reports/
+
+# Build artifacts
+build/
+dist/
+out/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup files
+*.bak
+*.backup
+backup/
+backups/
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Docker artifacts (when building nested containers)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Development tools
+.editorconfig
+.eslintrc*
+.prettierrc*
+.stylelintrc*
+jest.config.*
+babel.config.*
+webpack.config.*
+rollup.config.*
+vite.config.*
+
+# Package manager lockfiles (context-dependent)
+package-lock.json
+yarn.lock
+poetry.lock

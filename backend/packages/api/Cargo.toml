@@ -1,0 +1,23 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+description = "REST HTTP / WebSocket API for Ruuvi Home"
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio.workspace = true
+axum = { version = "0.8.4", features = ["macros"] }
+serde.workspace = true
+serde_json.workspace = true
+
+chrono = { version = "0.4", features = ["serde"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+postgres-store = { path = "../postgres-store" }
+tower-http = { version = "0.6.1", features = ["cors"] }

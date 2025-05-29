@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # MQTT Broker for testing
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: ruuvi-test-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto/config:/mosquitto/config
+      - ./docker/mosquitto/data:/mosquitto/data
+      - ./docker/mosquitto/log:/mosquitto/log
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$", "-C", "1", "-i", "healthcheck", "-W", "3"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # MQTT Simulator Tests
+  mqtt-simulator-tests:
+    build:
+      context: ./docker/mqtt-simulator
+      dockerfile: Dockerfile
+    container_name: ruuvi-mqtt-simulator-tests
+    depends_on:
+      - mosquitto
+    environment:
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=ruuvi/test/data
+      - PUBLISH_INTERVAL=0.1
+      - NUM_SENSORS=2
+      - GATEWAY_MAC=AA:BB:CC:DD:EE:FF
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./docker/mqtt-simulator:/app
+    command: python -m pytest tests/ -v --cov=simulator --cov-report=term
+
+  # Optional: Linting service
+  mqtt-simulator-lint:
+    build:
+      context: ./docker/mqtt-simulator
+      dockerfile: Dockerfile
+    container_name: ruuvi-mqtt-simulator-lint
+    volumes:
+      - ./docker/mqtt-simulator:/app
+    command: sh -c "flake8 simulator.py tests/ && black --check simulator.py tests/ && isort --check-only simulator.py tests/"
+
+networks:
+  default:
+    name: ruuvi-test-network

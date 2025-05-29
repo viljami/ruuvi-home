@@ -1,0 +1,33 @@
+[package]
+name = "mqtt-reader"
+version = "0.1.0"
+description = "MQTT server reader for Ruuvi Gateway sent sensor data and storing it in a database"
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "mqtt_reader"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mqtt_reader"
+path = "src/main.rs"
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+ruuvi-decoder = { path = "../ruuvi-decoder" }
+postgres-store = { path = "../postgres-store" }
+rumqttc = "0.24"
+async-stream = "0.3.6"
+
+[lints]
+workspace = true

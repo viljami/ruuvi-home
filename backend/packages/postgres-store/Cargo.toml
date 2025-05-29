@@ -1,0 +1,24 @@
+[package]
+name = "postgres-store"
+version = "0.1.0"
+edition = "2021"
+description = "PostgreSQL-based time-series storage for Ruuvi sensor data"
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio-rustls",
+    "postgres",
+    "chrono",
+    "migrate",
+    "macros"
+] }

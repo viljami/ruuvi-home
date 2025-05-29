@@ -1,0 +1,37 @@
+[workspace]
+members = ["packages/api", "packages/influxdb-ruuvi-event", "packages/mqtt-reader", "packages/ruuvi-decoder", "packages/postgres-store"]
+resolver = "2"
+
+# Workspace-wide package settings
+[workspace.package]
+edition = "2021"
+rust-version = "1.75"
+authors = ["Viljami Peltola"]
+description = "Ruuvi Gateway Home Edition for hosting on Rasperry PI sensor data collector and web page for display"
+license = "MIT"
+repository = "https://github.com/viljami/ruuvi-home"
+
+# Basic strict lints for all workspace members
+[workspace.lints.clippy]
+# Essential strict lints - no unwrap/expect/panic in production code
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+todo = "deny"
+pedantic = { level = "deny", priority = -1 }
+must-use-candidate = "allow"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+# Shared dependencies for workspace
+[workspace.dependencies]
+tokio = { version = "1.45.1", features = ["full"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.140"
+anyhow = "1.0.98"
+thiserror = "2.0.12"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+clap = { version = "4.5.38", features = ["derive"] }

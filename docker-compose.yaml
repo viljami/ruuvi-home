@@ -1,0 +1,160 @@
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: ruuvi-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./docker/mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    restart: unless-stopped
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto-simple.conf"]
+    environment:
+      - "ALLOW_ANONYMOUS=true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mosquitto_sub",
+          "-t",
+          "$$",
+          "-C",
+          "1",
+          "-i",
+          "healthcheck",
+          "-W",
+          "3",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MQTT Simulator for development
+  mqtt-simulator:
+    build:
+      context: ./docker/mqtt-simulator
+      dockerfile: Dockerfile
+    container_name: ruuvi-mqtt-simulator
+    depends_on:
+      - mosquitto
+    environment:
+      - MQTT_BROKER=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=ruuvi/gateway/data
+      - PUBLISH_INTERVAL=5.0
+      - NUM_SENSORS=3
+      - GATEWAY_MAC=AA:BB:CC:DD:EE:FF
+    restart: unless-stopped
+    volumes:
+      - ./docker/mqtt-simulator:/app
+
+  # MQTT Simulator Tests
+  # mqtt-simulator-tests:
+  #   build:
+  #     context: ./docker/mqtt-simulator
+  #     dockerfile: Dockerfile
+  #   container_name: ruuvi-mqtt-simulator-tests
+  #   depends_on:
+  #     - mosquitto
+  #   environment:
+  #     - MQTT_BROKER=mosquitto
+  #     - MQTT_PORT=1883
+  #     - MQTT_TOPIC=ruuvi/gateway/data
+  #     - PUBLISH_INTERVAL=0.1
+  #     - NUM_SENSORS=2
+  #     - GATEWAY_MAC=AA:BB:CC:DD:EE:FF
+  #   volumes:
+  #     - ./docker/mqtt-simulator:/app
+  #   command: python -m pytest tests/ -v --cov=simulator --cov-report=term
+
+  # Time-series Database with TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ruuvi-timescaledb
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+      - ./docker/timescaledb/init-timescaledb.sql:/docker-entrypoint-initdb.d/init-timescaledb.sql
+    environment:
+      - POSTGRES_DB=ruuvi_home
+      - POSTGRES_USER=ruuvi
+      - POSTGRES_PASSWORD=ruuvi_secret
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ruuvi -d ruuvi_home"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+
+  # MQTT Reader (Rust backend service)
+  mqtt-reader:
+    build:
+      context: .
+      dockerfile: ./docker/mqtt-reader.Dockerfile
+    container_name: ruuvi-mqtt-reader
+    depends_on:
+      - mosquitto
+      - timescaledb
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=ruuvi/gateway/data
+      - DATABASE_URL=postgresql://ruuvi:ruuvi_secret@timescaledb:5432/ruuvi_home
+      - RUST_LOG=info
+    restart: unless-stopped
+    # volumes:
+    #   - ./backend:/app
+
+  # API Server (Rust backend service)
+  api-server:
+    build:
+      context: .
+      dockerfile: ./docker/api-server.Dockerfile
+    container_name: ruuvi-api-server
+    ports:
+      - "8080:8080"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://ruuvi:ruuvi_secret@timescaledb:5432/ruuvi_home
+      - API_PORT=8080
+      - RUST_LOG=info
+    restart: unless-stopped
+    # volumes:
+    #   - ./backend:/app
+
+  # Frontend Web UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    container_name: ruuvi-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-server
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+      - NODE_ENV=development
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/node_modules
+    restart: unless-stopped
+    # command: npm start
+
+networks:
+  default:
+    name: ruuvi-network
+
+volumes:
+  timescaledb-data:
+  mosquitto-config:
+  mosquitto-data:
+  mosquitto-log:

@@ -1,0 +1,12 @@
+{
+  "sensors": [
+    {
+      "name": "outside",
+      "mac": "AA:BB:CC:DD:EE:01"
+    },
+    {
+      "name": "sauna",
+      "mac": "AA:BB:CC:DD:EE:02"
+    }
+  ]
+}
