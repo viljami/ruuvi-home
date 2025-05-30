@@ -34,82 +34,6 @@ ALTER TABLE sensor_data ADD CONSTRAINT chk_humidity CHECK (humidity BETWEEN 0 AN
 ALTER TABLE sensor_data ADD CONSTRAINT chk_pressure CHECK (pressure BETWEEN 300 AND 1300);
 ALTER TABLE sensor_data ADD CONSTRAINT chk_battery CHECK (battery BETWEEN 0 AND 4000);
 
--- Create continuous aggregates for time bucketing
-CREATE MATERIALIZED VIEW sensor_data_hourly
-WITH (timescaledb.continuous) AS
-SELECT
-    sensor_mac,
-    gateway_mac,
-    time_bucket('1 hour', timestamp) AS bucket,
-    AVG(temperature) AS avg_temperature,
-    MIN(temperature) AS min_temperature,
-    MAX(temperature) AS max_temperature,
-    AVG(humidity) AS avg_humidity,
-    MIN(humidity) AS min_humidity,
-    MAX(humidity) AS max_humidity,
-    AVG(pressure) AS avg_pressure,
-    MIN(pressure) AS min_pressure,
-    MAX(pressure) AS max_pressure,
-    AVG(battery) AS avg_battery,
-    MIN(battery) AS min_battery,
-    MAX(battery) AS max_battery,
-    COUNT(*) AS reading_count
-FROM sensor_data
-GROUP BY sensor_mac, gateway_mac, bucket;
-
-CREATE MATERIALIZED VIEW sensor_data_daily
-WITH (timescaledb.continuous) AS
-SELECT
-    sensor_mac,
-    gateway_mac,
-    time_bucket('1 day', timestamp) AS bucket,
-    AVG(temperature) AS avg_temperature,
-    MIN(temperature) AS min_temperature,
-    MAX(temperature) AS max_temperature,
-    AVG(humidity) AS avg_humidity,
-    MIN(humidity) AS min_humidity,
-    MAX(humidity) AS max_humidity,
-    AVG(pressure) AS avg_pressure,
-    MIN(pressure) AS min_pressure,
-    MAX(pressure) AS max_pressure,
-    AVG(battery) AS avg_battery,
-    MIN(battery) AS min_battery,
-    MAX(battery) AS max_battery,
-    COUNT(*) AS reading_count
-FROM sensor_data
-GROUP BY sensor_mac, gateway_mac, bucket;
-
--- Add refresh policies for continuous aggregates
-SELECT add_continuous_aggregate_policy('sensor_data_hourly',
-    start_offset => INTERVAL '3 hours',
-    end_offset => INTERVAL '1 hour',
-    schedule_interval => INTERVAL '1 hour');
-
-SELECT add_continuous_aggregate_policy('sensor_data_daily',
-    start_offset => INTERVAL '3 days',
-    end_offset => INTERVAL '1 day',
-    schedule_interval => INTERVAL '1 day');
-
--- Tiered compression policy for long-term storage optimization
--- Compress data older than 7 days (saves ~90% space)
-SELECT add_compression_policy('sensor_data', INTERVAL '7 days');
-
--- 5-year retention policy for raw sensor data
--- Storage estimate for 10 sensors @ 10-second intervals:
--- - Raw data: ~30GB over 5 years
--- - With compression: ~3GB over 5 years (very manageable)
-SELECT add_retention_policy('sensor_data', INTERVAL '5 years');
-
--- Keep continuous aggregates longer than raw data for historical analysis
--- Hourly aggregates: keep for 7 years
--- Daily aggregates: keep for 10 years (minimal storage overhead)
-SELECT add_retention_policy('sensor_data_hourly', INTERVAL '7 years');
-SELECT add_retention_policy('sensor_data_daily', INTERVAL '10 years');
-
--- Create indexes on continuous aggregates
-CREATE INDEX idx_sensor_data_hourly_sensor_bucket ON sensor_data_hourly(sensor_mac, bucket DESC);
-CREATE INDEX idx_sensor_data_daily_sensor_bucket ON sensor_data_daily(sensor_mac, bucket DESC);
-
 -- Create a function for time bucket queries with flexible intervals
 CREATE OR REPLACE FUNCTION get_sensor_data_bucketed(
     p_sensor_mac TEXT,
@@ -153,8 +77,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Storage monitoring and estimation functions
-
 -- Function to get current storage usage statistics
 CREATE OR REPLACE FUNCTION get_storage_stats()
 RETURNS TABLE(
@@ -189,7 +111,7 @@ BEGIN
         (SELECT MIN(timestamp) FROM sensor_data) AS oldest_data,
         (SELECT MAX(timestamp) FROM sensor_data) AS newest_data
     FROM (
-        SELECT SUM(compressed_total_bytes) AS compressed_size
+        SELECT COALESCE(SUM(compressed_total_bytes), 0) AS compressed_size
         FROM timescaledb_information.compressed_chunk_stats 
         WHERE hypertable_name = 'sensor_data'
     ) compressed_chunk_size;
@@ -266,15 +188,15 @@ BEGIN
     LIMIT 1;
     
     -- Estimate size 30 days ago (this is approximate)
-    size_30_days_ago_mb := current_size_mb * 0.9; -- Rough estimate
+    size_30_days_ago_mb := COALESCE(current_size_mb * 0.9, 0); -- Rough estimate
     
     RETURN QUERY
     SELECT 
         days_back AS period_days,
         COUNT(*) AS readings_added,
-        ROUND(COUNT(*)::NUMERIC / days_back, 2) AS readings_per_day,
+        ROUND(COUNT(*)::NUMERIC / GREATEST(days_back, 1), 2) AS readings_per_day,
         ROUND(current_size_mb - size_30_days_ago_mb, 2) AS storage_growth_mb,
-        ROUND((current_size_mb - size_30_days_ago_mb) * 365.0 / days_back / 1024.0, 2) AS estimated_yearly_growth_gb
+        ROUND((current_size_mb - size_30_days_ago_mb) * 365.0 / GREATEST(days_back, 1) / 1024.0, 2) AS estimated_yearly_growth_gb
     FROM sensor_data
     WHERE timestamp >= start_time;
 END;
@@ -290,28 +212,3 @@ SELECT
         ELSE 0 
     END AS compression_savings_percent
 FROM get_storage_stats();
-
--- Storage estimation examples and comments
-/*
-STORAGE ESTIMATES FOR RUUVI SENSORS:
-
-10 sensors, 10-second intervals, 5 years:
-- Total readings: ~157 million
-- Raw data: ~31.4 GB
-- Compressed data: ~3.1 GB (with TimescaleDB compression)
-- Daily aggregates: ~27 MB
-- Hourly aggregates: ~657 MB
-- Total estimated storage: ~3.8 GB over 5 years
-
-This is very manageable for most systems. Even with 20 sensors, you'd only need ~7.6 GB.
-
-To monitor storage:
-SELECT * FROM storage_monitoring;
-
-To get growth statistics:
-SELECT * FROM get_growth_statistics(30);
-
-To estimate different scenarios:
-SELECT * FROM estimate_storage_requirements(10, 10, 5); -- 10 sensors, 10s interval, 5 years
-SELECT * FROM estimate_storage_requirements(20, 5, 3);  -- 20 sensors, 5s interval, 3 years
-*/

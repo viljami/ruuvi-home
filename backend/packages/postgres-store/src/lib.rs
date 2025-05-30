@@ -1,7 +1,19 @@
 use anyhow::Result;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, PgPool, Row};
+use bigdecimal::ToPrimitive;
+use chrono::{
+    DateTime,
+    Utc,
+};
+use serde::{
+    Deserialize,
+    Serialize,
+};
+use sqlx::{
+    types::BigDecimal,
+    FromRow,
+    PgPool,
+    Row,
+};
 use tokio::sync::broadcast;
 use tracing::error;
 
@@ -70,16 +82,13 @@ pub struct PostgresStore {
 impl PostgresStore {
     pub async fn new(database_url: &str) -> Result<Self> {
         let pool = PgPool::connect(database_url).await?;
-        
+
         // Run migrations if needed - for now just test connection
         sqlx::query("SELECT 1").execute(&pool).await?;
-        
+
         let (event_sender, _) = broadcast::channel(1000);
-        
-        Ok(Self {
-            pool,
-            event_sender,
-        })
+
+        Ok(Self { pool, event_sender })
     }
 
     pub async fn insert_event(&self, event: &Event) -> Result<()> {
@@ -92,7 +101,7 @@ impl PostgresStore {
                 rssi, timestamp
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-            "#
+            "#,
         )
         .bind(&event.sensor_mac)
         .bind(&event.gateway_mac)
@@ -113,8 +122,10 @@ impl PostgresStore {
         .await?;
 
         // Notify subscribers of new data
-        if let Err(e) = self.event_sender.send(event.clone()) {
-            error!("Failed to broadcast new event: {}", e);
+        if self.event_sender.receiver_count() > 0 {
+            if let Err(e) = self.event_sender.send(event.clone()) {
+                error!("Failed to broadcast new event: {}", e);
+            }
         }
 
         Ok(())
@@ -131,7 +142,7 @@ impl PostgresStore {
             FROM sensor_data
             WHERE timestamp > NOW() - INTERVAL '24 hours'
             ORDER BY sensor_mac, gateway_mac, timestamp DESC
-            "#
+            "#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -171,7 +182,7 @@ impl PostgresStore {
             WHERE sensor_mac = $1
             ORDER BY timestamp DESC
             LIMIT 1
-            "#
+            "#,
         )
         .bind(sensor_mac)
         .fetch_optional(&self.pool)
@@ -223,7 +234,7 @@ impl PostgresStore {
               AND timestamp <= $3
             ORDER BY timestamp DESC
             LIMIT $4
-            "#
+            "#,
         )
         .bind(sensor_mac)
         .bind(start)
@@ -273,7 +284,7 @@ impl PostgresStore {
               AND timestamp >= $2
               AND timestamp <= $3
             ORDER BY timestamp ASC
-            "#
+            "#,
         )
         .bind(sensor_mac)
         .bind(start)
@@ -309,14 +320,10 @@ impl PostgresStore {
         self.event_sender.subscribe()
     }
 
-    pub async fn get_sensor_statistics(
-        &self,
-        sensor_mac: &str,
-        hours: i32,
-    ) -> Result<SensorStats> {
+    pub async fn get_sensor_statistics(&self, sensor_mac: &str, hours: i32) -> Result<SensorStats> {
         let row = sqlx::query(
             r#"
-            SELECT 
+            SELECT
                 AVG(temperature) as avg_temp,
                 MIN(temperature) as min_temp,
                 MAX(temperature) as max_temp,
@@ -330,7 +337,7 @@ impl PostgresStore {
             FROM sensor_data
             WHERE sensor_mac = $1
               AND timestamp > NOW() - INTERVAL '1 hour' * $2
-            "#
+            "#,
         )
         .bind(sensor_mac)
         .bind(hours)
@@ -352,10 +359,11 @@ impl PostgresStore {
     }
 
     pub async fn cleanup_old_data(&self, days_to_keep: i32) -> Result<u64> {
-        let result = sqlx::query("DELETE FROM sensor_data WHERE timestamp < NOW() - INTERVAL '1 day' * $1")
-            .bind(days_to_keep)
-            .execute(&self.pool)
-            .await?;
+        let result =
+            sqlx::query("DELETE FROM sensor_data WHERE timestamp < NOW() - INTERVAL '1 day' * $1")
+                .bind(days_to_keep)
+                .execute(&self.pool)
+                .await?;
 
         Ok(result.rows_affected())
     }
@@ -368,11 +376,11 @@ impl PostgresStore {
         end_time: DateTime<Utc>,
     ) -> Result<Vec<TimeBucketedData>> {
         let interval_str = interval.to_interval_string();
-        
+
         // For now, implement basic time bucketing without the custom function
         let query = format!(
             r#"
-            SELECT 
+            SELECT
                 time_bucket(INTERVAL '{}', timestamp) AS bucket,
                 AVG(temperature) AS avg_temperature,
                 MIN(temperature) AS min_temperature,
@@ -428,7 +436,8 @@ impl PostgresStore {
         end_time: DateTime<Utc>,
     ) -> Result<Vec<TimeBucketedData>> {
         // Fallback to basic query if continuous aggregates don't exist yet
-        self.get_time_bucketed_data(sensor_mac, &TimeInterval::Hours(1), start_time, end_time).await
+        self.get_time_bucketed_data(sensor_mac, &TimeInterval::Hours(1), start_time, end_time)
+            .await
     }
 
     pub async fn get_daily_aggregates(
@@ -438,7 +447,8 @@ impl PostgresStore {
         end_time: DateTime<Utc>,
     ) -> Result<Vec<TimeBucketedData>> {
         // Fallback to basic query if continuous aggregates don't exist yet
-        self.get_time_bucketed_data(sensor_mac, &TimeInterval::Days(1), start_time, end_time).await
+        self.get_time_bucketed_data(sensor_mac, &TimeInterval::Days(1), start_time, end_time)
+            .await
     }
 
     pub async fn get_recent_aggregates(
@@ -449,8 +459,9 @@ impl PostgresStore {
     ) -> Result<Vec<TimeBucketedData>> {
         let end_time = Utc::now();
         let start_time = end_time - chrono::Duration::hours(hours_back as i64);
-        
-        self.get_time_bucketed_data(sensor_mac, interval, start_time, end_time).await
+
+        self.get_time_bucketed_data(sensor_mac, interval, start_time, end_time)
+            .await
     }
 
     pub async fn get_temperature_trend(
@@ -459,10 +470,10 @@ impl PostgresStore {
         hours_back: i32,
     ) -> Result<Vec<(DateTime<Utc>, f64)>> {
         let start_time = Utc::now() - chrono::Duration::hours(hours_back as i64);
-        
+
         let rows = sqlx::query(
             r#"
-            SELECT 
+            SELECT
                 time_bucket(INTERVAL '15 minutes', timestamp) AS bucket,
                 AVG(temperature) AS avg_temp
             FROM sensor_data
@@ -470,7 +481,7 @@ impl PostgresStore {
               AND timestamp >= $2
             GROUP BY bucket
             ORDER BY bucket
-            "#
+            "#,
         )
         .bind(sensor_mac)
         .bind(start_time)
@@ -481,7 +492,7 @@ impl PostgresStore {
         for row in rows {
             if let (Some(bucket), Some(avg_temp)) = (
                 row.get::<Option<DateTime<Utc>>, _>("bucket"),
-                row.get::<Option<f64>, _>("avg_temp")
+                row.get::<Option<f64>, _>("avg_temp"),
             ) {
                 data.push((bucket, avg_temp));
             }
@@ -496,10 +507,10 @@ impl PostgresStore {
         hours_back: i32,
     ) -> Result<SensorHealthMetrics> {
         let start_time = Utc::now() - chrono::Duration::hours(hours_back as i64);
-        
+
         let row = sqlx::query(
             r#"
-            SELECT 
+            SELECT
                 COUNT(*) as total_readings,
                 AVG(battery) as avg_battery,
                 MIN(battery) as min_battery,
@@ -509,18 +520,21 @@ impl PostgresStore {
             FROM sensor_data
             WHERE sensor_mac = $1
               AND timestamp >= $2
-            "#
+            "#,
         )
         .bind(sensor_mac)
         .bind(start_time)
         .fetch_one(&self.pool)
         .await?;
 
+        let avg_battery_bd: Option<BigDecimal> = row.get("avg_battery");
+        let avg_rssi_bd: Option<BigDecimal> = row.get("avg_rssi");
+
         Ok(SensorHealthMetrics {
             total_readings: row.get::<Option<i64>, _>("total_readings").unwrap_or(0),
-            avg_battery: row.get::<Option<f64>, _>("avg_battery").unwrap_or(0.0),
+            avg_battery: avg_battery_bd.and_then(|bd| bd.to_f64()).unwrap_or(0.0),
             min_battery: row.get::<Option<i64>, _>("min_battery").unwrap_or(0),
-            avg_rssi: row.get::<Option<f64>, _>("avg_rssi").unwrap_or(0.0),
+            avg_rssi: avg_rssi_bd.and_then(|bd| bd.to_f64()).unwrap_or(0.0),
             min_rssi: row.get::<Option<i64>, _>("min_rssi").unwrap_or(0),
             last_reading: row.get("last_reading"),
         })
@@ -530,7 +544,7 @@ impl PostgresStore {
         // Simplified storage stats without custom functions
         let row = sqlx::query(
             r#"
-            SELECT 
+            SELECT
                 'sensor_data' as table_name,
                 pg_total_relation_size('sensor_data') / 1024.0 / 1024.0 as raw_size_mb,
                 pg_total_relation_size('sensor_data') / 1024.0 / 1024.0 as compressed_size_mb,
@@ -539,16 +553,21 @@ impl PostgresStore {
                 MIN(timestamp) as oldest_data,
                 MAX(timestamp) as newest_data
             FROM sensor_data
-            "#
+            "#,
         )
         .fetch_one(&self.pool)
         .await?;
 
+        let raw_size_mb: Option<BigDecimal> = row.get("raw_size_mb");
+        let compressed_size_mb: Option<BigDecimal> = row.get("compressed_size_mb");
+
+        let compression_ratio_bd: Option<BigDecimal> = row.get("compression_ratio");
+
         Ok(StorageStats {
             table_name: row.get("table_name"),
-            raw_size_mb: row.get("raw_size_mb"),
-            compressed_size_mb: row.get("compressed_size_mb"),
-            compression_ratio: row.get("compression_ratio"),
+            raw_size_mb: raw_size_mb.and_then(|a| a.to_f64()),
+            compressed_size_mb: compressed_size_mb.and_then(|a| a.to_f64()),
+            compression_ratio: compression_ratio_bd.and_then(|bd| bd.to_f64()),
             row_count: row.get("row_count"),
             oldest_data: row.get("oldest_data"),
             newest_data: row.get("newest_data"),
@@ -563,30 +582,39 @@ impl PostgresStore {
     ) -> Result<StorageEstimate> {
         // Simple calculation
         let readings_per_sensor_per_year = (365 * 24 * 3600) / reading_interval_seconds as i64;
-        let total_readings = readings_per_sensor_per_year * sensor_count as i64 * retention_years as i64;
+        let total_readings =
+            readings_per_sensor_per_year * sensor_count as i64 * retention_years as i64;
         let bytes_per_reading = 200;
         let compression_ratio = 10.0;
-        
-        let uncompressed_gb = (total_readings * bytes_per_reading) as f64 / 1024.0 / 1024.0 / 1024.0;
+
+        let uncompressed_gb =
+            (total_readings * bytes_per_reading) as f64 / 1024.0 / 1024.0 / 1024.0;
         let compressed_gb = uncompressed_gb / compression_ratio;
-        
+
         Ok(StorageEstimate {
-            scenario: format!("{} sensors, {} sec intervals, {} years", sensor_count, reading_interval_seconds, retention_years),
+            scenario: format!(
+                "{} sensors, {} sec intervals, {} years",
+                sensor_count, reading_interval_seconds, retention_years
+            ),
             total_readings: Some(total_readings),
             uncompressed_size_gb: Some(uncompressed_gb),
             compressed_size_gb: Some(compressed_gb),
-            daily_aggregates_size_mb: Some((sensor_count * 365 * retention_years * 150) as f64 / 1024.0 / 1024.0),
-            hourly_aggregates_size_mb: Some((sensor_count * 365 * 24 * retention_years * 150) as f64 / 1024.0 / 1024.0),
+            daily_aggregates_size_mb: Some(
+                (sensor_count * 365 * retention_years * 150) as f64 / 1024.0 / 1024.0,
+            ),
+            hourly_aggregates_size_mb: Some(
+                (sensor_count * 365 * 24 * retention_years * 150) as f64 / 1024.0 / 1024.0,
+            ),
             total_estimated_size_gb: Some(compressed_gb + 0.1), // Add small overhead
         })
     }
 
     pub async fn get_growth_statistics(&self, days_back: i32) -> Result<GrowthStatistics> {
         let start_time = Utc::now() - chrono::Duration::days(days_back as i64);
-        
+
         let row = sqlx::query(
             r#"
-            SELECT 
+            SELECT
                 $1 as period_days,
                 COUNT(*) as readings_added,
                 COUNT(*)::NUMERIC / $1 as readings_per_day,
@@ -594,19 +622,24 @@ impl PostgresStore {
                 365.0 as estimated_yearly_growth_gb
             FROM sensor_data
             WHERE timestamp >= $2
-            "#
+            "#,
         )
         .bind(days_back)
         .bind(start_time)
         .fetch_one(&self.pool)
         .await?;
 
+        let readings_per_day_bd: Option<BigDecimal> = row.get("readings_per_day");
+        let storage_growth_mb_bd: Option<BigDecimal> = row.get("storage_growth_mb");
+        let estimated_yearly_growth_gb_bd: Option<BigDecimal> =
+            row.get("estimated_yearly_growth_gb");
+
         Ok(GrowthStatistics {
             period_days: row.get("period_days"),
             readings_added: row.get("readings_added"),
-            readings_per_day: row.get("readings_per_day"),
-            storage_growth_mb: row.get("storage_growth_mb"),
-            estimated_yearly_growth_gb: row.get("estimated_yearly_growth_gb"),
+            readings_per_day: readings_per_day_bd.and_then(|bd| bd.to_f64()),
+            storage_growth_mb: storage_growth_mb_bd.and_then(|bd| bd.to_f64()),
+            estimated_yearly_growth_gb: estimated_yearly_growth_gb_bd.and_then(|bd| bd.to_f64()),
         })
     }
 
@@ -686,7 +719,7 @@ pub struct TimeBucketedData {
     pub reading_count: Option<i64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TimeInterval {
     Minutes(i32),
     Hours(i32),

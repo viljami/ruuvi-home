@@ -1,5 +1,11 @@
 [workspace]
-members = ["packages/api", "packages/influxdb-ruuvi-event", "packages/mqtt-reader", "packages/ruuvi-decoder", "packages/postgres-store"]
+members = [
+  "packages/api",
+  "packages/influxdb-ruuvi-event",
+  "packages/mqtt-reader",
+  "packages/ruuvi-decoder",
+  "packages/postgres-store",
+]
 resolver = "2"
 
 # Workspace-wide package settings
@@ -34,4 +40,4 @@ anyhow = "1.0.98"
 thiserror = "2.0.12"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-clap = { version = "4.5.38", features = ["derive"] }
+clap = { version = "4.5.39", features = ["derive"] }

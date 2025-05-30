@@ -1,6 +1,9 @@
+use chrono::{
+    DateTime,
+    Utc,
+};
 use futures::Stream;
 use postgres_store::Event;
-use chrono::{DateTime, Utc};
 use rumqttc::Incoming;
 use ruuvi_decoder::{
     Decoder,
@@ -16,26 +19,26 @@ pub struct DecodedMessage {
     pub sensor_data: ruuvi_decoder::SensorData5,
 }
 
-impl Into<Event> for DecodedMessage {
-    fn into(self) -> Event {
-        let timestamp = DateTime::from_timestamp(i64::from(self.message.ts), 0)
-            .unwrap_or_else(Utc::now);
-            
+impl From<DecodedMessage> for Event {
+    fn from(val: DecodedMessage) -> Self {
+        let timestamp =
+            DateTime::from_timestamp(i64::from(val.message.ts), 0).unwrap_or_else(Utc::now);
+
         Event {
-            sensor_mac: self.sensor_data.mac,
-            gateway_mac: self.message.gw_mac,
-            temperature: f64::from(self.sensor_data.temperature),
-            humidity: f64::from(self.sensor_data.humidity.unwrap_or(0.0)),
-            pressure: f64::from(self.sensor_data.pressure.unwrap_or(0.0)),
-            battery: i64::from(self.sensor_data.battery.unwrap_or(0)),
-            tx_power: i64::from(self.sensor_data.tx_power.unwrap_or(0)),
-            movement_counter: i64::from(self.sensor_data.movement_counter),
-            measurement_sequence_number: i64::from(self.sensor_data.measurement_sequence_number),
-            acceleration: f64::from(self.sensor_data.acceleration),
-            acceleration_x: i64::from(self.sensor_data.acceleration_x),
-            acceleration_y: i64::from(self.sensor_data.acceleration_y),
-            acceleration_z: i64::from(self.sensor_data.acceleration_z),
-            rssi: i64::from(self.sensor_data.rssi.unwrap_or(0)),
+            sensor_mac: val.sensor_data.mac,
+            gateway_mac: val.message.gw_mac,
+            temperature: f64::from(val.sensor_data.temperature),
+            humidity: f64::from(val.sensor_data.humidity.unwrap_or(0.0)),
+            pressure: f64::from(val.sensor_data.pressure.unwrap_or(0.0)),
+            battery: i64::from(val.sensor_data.battery.unwrap_or(0)),
+            tx_power: i64::from(val.sensor_data.tx_power.unwrap_or(0)),
+            movement_counter: i64::from(val.sensor_data.movement_counter),
+            measurement_sequence_number: i64::from(val.sensor_data.measurement_sequence_number),
+            acceleration: f64::from(val.sensor_data.acceleration),
+            acceleration_x: i64::from(val.sensor_data.acceleration_x),
+            acceleration_y: i64::from(val.sensor_data.acceleration_y),
+            acceleration_z: i64::from(val.sensor_data.acceleration_z),
+            rssi: i64::from(val.sensor_data.rssi.unwrap_or(0)),
             timestamp,
         }
     }
