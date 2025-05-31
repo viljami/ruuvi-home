@@ -1,0 +1,121 @@
+# Ruuvi Home Setup Configuration
+# This file contains all configurable parameters for the Pi setup process
+
+# User Configuration
+user:
+  name: "{{ SUDO_USER | default('pi') }}"
+  home: "/home/{{ user.name }}"
+  shell: "/usr/bin/fish"
+
+# Project Structure
+project:
+  name: "ruuvi-home"
+  repository: "https://github.com/viljami/ruuvi-home.git"
+  branch: "main"
+  directory: "{{ user.home }}/{{ project.name }}"
+
+# Directories
+directories:
+  data: "{{ project.directory }}/data"
+  logs: "/var/log/ruuvi-home"
+  backups: "{{ project.directory }}/backups"
+  config: "{{ project.directory }}/config"
+  scripts: "{{ project.directory }}/scripts"
+
+# Service Ports
+ports:
+  webhook: 9000
+  frontend: 80
+  api: 3000
+  database: 5432
+  mosquitto: 1883
+
+# Database Configuration
+database:
+  host: "timescaledb"
+  port: "{{ ports.database }}"
+  name: "ruuvi_home"
+  user: "ruuvi"
+  password: "{{ POSTGRES_PASSWORD | default('change_me_in_production') }}"
+
+# MQTT Configuration
+mqtt:
+  host: "mosquitto"
+  port: "{{ ports.mosquitto }}"
+  username: "ruuvi"
+  password: "{{ MQTT_PASSWORD | default('change_me_in_production') }}"
+
+# Webhook Configuration
+webhook:
+  port: "{{ ports.webhook }}"
+  secret: "{{ WEBHOOK_SECRET | default('') }}"
+
+# System Configuration
+system:
+  timezone: "{{ TZ | default('Europe/Helsinki') }}"
+  locale: "en_US.UTF-8"
+  log_level: "{{ LOG_LEVEL | default('info') }}"
+
+# Docker Configuration
+docker:
+  compose_version: "2.24.0"
+  log_driver: "json-file"
+  log_max_size: "10m"
+  log_max_file: "3"
+  storage_driver: "overlay2"
+
+# Backup Configuration
+backup:
+  retention_days: 30
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  enabled: true
+
+# Feature Flags
+features:
+  fish_shell: true
+  backup_cron: true
+  monitoring: true
+  firewall: true
+  log_rotation: true
+
+# Python Configuration
+python:
+  version: "3"
+  venv_path: "{{ project.directory }}/.venv"
+  requirements:
+    - "requests>=2.25.0"
+    - "psycopg2-binary>=2.8.0"
+    - "paho-mqtt>=1.5.0"
+    - "pyyaml>=5.4.0"
+    - "jinja2>=3.0.0"
+
+# Security Settings
+security:
+  file_permissions:
+    scripts: 0o755
+    configs: 0o644
+    secrets: 0o600
+    directories: 0o755
+
+# Monitoring Configuration
+monitoring:
+  health_check_interval: 300  # 5 minutes
+  log_retention_days: 14
+  alert_thresholds:
+    cpu_usage: 80
+    memory_usage: 85
+    disk_usage: 90
+
+# Service Dependencies
+services:
+  ruuvi_home:
+    description: "Ruuvi Home Application"
+    requires: ["docker.service"]
+    after: ["docker.service", "network.target"]
+    restart: "always"
+    
+  ruuvi_webhook:
+    description: "Ruuvi Home Deployment Webhook"
+    requires: ["network.target"]
+    after: ["network.target"]
+    restart: "always"

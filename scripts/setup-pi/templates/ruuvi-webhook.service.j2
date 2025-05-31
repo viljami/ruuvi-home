@@ -1,0 +1,32 @@
+[Unit]
+Description={{ services.ruuvi_webhook.description }}
+After={{ services.ruuvi_webhook.after | join(' ') }}
+{% for req in services.ruuvi_webhook.requires %}
+Requires={{ req }}
+{% endfor %}
+
+[Service]
+Type=simple
+User={{ user.name }}
+Group={{ user.name }}
+WorkingDirectory={{ project.directory }}
+ExecStart={{ python.venv_path }}/bin/python3 {{ project.directory }}/scripts/deploy-webhook.py
+Restart={{ services.ruuvi_webhook.restart }}
+RestartSec=10
+Environment=WEBHOOK_PORT={{ webhook.port }}
+Environment=PROJECT_DIR={{ project.directory }}
+Environment=LOG_LEVEL={{ system.log_level }}
+EnvironmentFile={{ project.directory }}/.env
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ruuvi-webhook
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ project.directory }} {{ directories.logs }}
+
+[Install]
+WantedBy=multi-user.target

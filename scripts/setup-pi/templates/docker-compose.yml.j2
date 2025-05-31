@@ -1,0 +1,216 @@
+version: '3.8'
+
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ruuvi-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: {{ database.name }}
+      POSTGRES_USER: {{ database.user }}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - {{ directories.data }}/timescaledb:/var/lib/postgresql/data
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - ruuvi-internal
+    ports:
+      - "127.0.0.1:{{ ports.database }}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ database.user }} -d {{ database.name }}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    user: postgres
+    read_only: false
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql
+
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: ruuvi-mosquitto
+    restart: unless-stopped
+    volumes:
+      - {{ directories.data }}/mosquitto/config:/mosquitto/config
+      - {{ directories.data }}/mosquitto/data:/mosquitto/data
+      - {{ directories.data }}/mosquitto/log:/mosquitto/log
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - ruuvi-internal
+    ports:
+      - "127.0.0.1:{{ ports.mosquitto }}:1883"
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t test -m 'health-check' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    user: "1883:1883"
+    read_only: true
+    tmpfs:
+      - /tmp
+
+  api:
+    image: ghcr.io/viljami/ruuvi-home-api:latest
+    container_name: ruuvi-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://{{ database.user }}:${POSTGRES_PASSWORD}@timescaledb:{{ ports.database }}/{{ database.name }}
+      MQTT_HOST: mosquitto
+      MQTT_PORT: {{ ports.mosquitto }}
+      MQTT_USERNAME: {{ mqtt.username }}
+      MQTT_PASSWORD: ${MQTT_PASSWORD}
+      API_PORT: {{ ports.api }}
+      TZ: {{ system.timezone }}
+      NODE_ENV: production
+    volumes:
+      - {{ directories.data }}/api:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - ruuvi-internal
+      - ruuvi-public
+    ports:
+      - "{{ ports.api }}:{{ ports.api }}"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:{{ ports.api }}/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    user: "1000:1000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/tmp
+
+  frontend:
+    image: ghcr.io/viljami/ruuvi-home-frontend:latest
+    container_name: ruuvi-frontend
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:{{ ports.api }}
+      TZ: {{ system.timezone }}
+    volumes:
+      - {{ directories.data }}/frontend:/app/data
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - ruuvi-internal
+      - ruuvi-public
+    ports:
+      - "{{ ports.frontend }}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    user: "101:101"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
+  nginx:
+    image: nginx:alpine
+    container_name: ruuvi-nginx
+    restart: unless-stopped
+    volumes:
+      - {{ project.directory }}/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - {{ project.directory }}/config/nginx/conf.d:/etc/nginx/conf.d:ro
+      - {{ directories.logs }}/nginx:/var/log/nginx
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - ruuvi-public
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - frontend
+      - api
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:80/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    user: "101:101"
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
+networks:
+  ruuvi-internal:
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.20.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: ruuvi-internal
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "false"
+
+  ruuvi-public:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.21.0.0/16
+    driver_opts:
+      com.docker.network.bridge.name: ruuvi-public
+      com.docker.network.bridge.enable_icc: "true"
+      com.docker.network.bridge.enable_ip_masquerade: "true"
+
+volumes:
+  timescaledb-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: {{ directories.data }}/timescaledb
+
+  mosquitto-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: {{ directories.data }}/mosquitto
+
+  api-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: {{ directories.data }}/api
+
+  frontend-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: {{ directories.data }}/frontend
