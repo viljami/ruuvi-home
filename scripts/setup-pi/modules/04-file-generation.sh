@@ -1,7 +1,7 @@
 #!/bin/bash
 # Module: File Generation
-# Description: Generates scripts and configuration files using Python templates
-# Dependencies: 01-system-setup.sh (Python installation), 03-directories.sh (project structure)
+# Description: Generates scripts and configuration files using simple bash templates
+# Dependencies: 01-system-setup.sh, 03-directories.sh (project structure)
 
 set -e
 
@@ -16,131 +16,291 @@ LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
 
-# Generator configuration
-readonly GENERATOR_SCRIPT="$(dirname "$SCRIPT_DIR")/generator.py"
-readonly REQUIREMENTS=(
-    "pyyaml>=5.4.0"
-    "jinja2>=3.0.0"
-)
-
-# Install Python dependencies for generator
-install_generator_dependencies() {
+# Generate deploy webhook Python script
+generate_deploy_webhook_script() {
     local context="$MODULE_CONTEXT"
+    local script_path="$PROJECT_DIR/scripts/deploy-webhook.py"
     
-    log_info "$context" "Installing Python dependencies for file generator"
+    log_info "$context" "Generating deploy webhook script"
     
-    # Use system packages to avoid externally-managed-environment error
-    local system_packages=(
-        "python3-yaml"
-        "python3-jinja2"
-    )
+    mkdir -p "$(dirname "$script_path")"
     
-    export DEBIAN_FRONTEND=noninteractive
-    
-    # Update package lists first
-    if ! apt-get update -qq; then
-        log_error "$context" "Failed to update package lists"
-        return 1
-    fi
-    
-    # Install required system packages
-    for package in "${system_packages[@]}"; do
-        log_debug "$context" "Installing system package: $package"
-        if ! apt-get install -y -qq "$package"; then
-            log_error "$context" "Failed to install system package: $package"
-            return 1
-        fi
-    done
-    
-    log_success "$context" "Generator dependencies installed"
-    return 0
-}
+    cat > "$script_path" << EOF
+#!/usr/bin/env python3
+"""
+Ruuvi Home Deployment Webhook Server
+Handles GitHub webhook deployments
+"""
 
-# Create runtime configuration for generator
-create_runtime_config() {
-    local context="$MODULE_CONTEXT"
-    local runtime_config="/tmp/ruuvi-setup-config.yaml"
+import os
+import sys
+import json
+import hmac
+import hashlib
+import subprocess
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+# Configuration
+WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '${WEBHOOK_SECRET}')
+WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', '${WEBHOOK_PORT}'))
+PROJECT_DIR = '${PROJECT_DIR}'
+LOG_FILE = '${LOG_DIR}/webhook.log'
+
+class WebhookHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            content_length = int(self.headers['Content-Length'])
+            payload = self.rfile.read(content_length)
+            
+            # Verify signature
+            signature = self.headers.get('X-Hub-Signature-256')
+            if not self.verify_signature(payload, signature):
+                self.send_response(401)
+                self.end_headers()
+                return
+            
+            # Parse payload
+            data = json.loads(payload.decode('utf-8'))
+            
+            # Handle push events to main branch
+            if data.get('ref') == 'refs/heads/main':
+                self.deploy()
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'Deployment triggered')
+            else:
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'No action taken')
+                
+        except Exception as e:
+            print(f"Webhook error: {e}")
+            self.send_response(500)
+            self.end_headers()
     
-    log_info "$context" "Creating runtime configuration"
+    def verify_signature(self, payload, signature):
+        if not signature or not WEBHOOK_SECRET:
+            return False
+        
+        expected = 'sha256=' + hmac.new(
+            WEBHOOK_SECRET.encode(),
+            payload,
+            hashlib.sha256
+        ).hexdigest()
+        
+        return hmac.compare_digest(signature, expected)
     
-    # Create dynamic config by substituting environment variables
-    cat > "$runtime_config" << EOF
-# Runtime configuration for Ruuvi Home setup
-ruuvi_user: "$RUUVI_USER"
-project_dir: "$PROJECT_DIR"
-data_dir: "$DATA_DIR"
-log_dir: "$LOG_DIR"
-backup_dir: "$BACKUP_DIR"
-webhook_port: ${WEBHOOK_PORT:-9000}
-webhook_secret: "${WEBHOOK_SECRET}"
-frontend_port: ${FRONTEND_PORT:-80}
-api_port: ${API_PORT:-3000}
-db_port: ${DB_PORT:-5432}
-db_user: "${DB_USER:-ruuvi}"
-db_name: "${DB_NAME:-ruuvi_home}"
-mosquitto_port: ${MOSQUITTO_PORT:-1883}
-timezone: "${TZ:-Europe/Helsinki}"
-python_venv: "$PROJECT_DIR/.venv"
-postgres_password: "${POSTGRES_PASSWORD}"
-mqtt_password: "${MQTT_PASSWORD}"
-jwt_secret: "${JWT_SECRET}"
-session_secret: "${SESSION_SECRET}"
+    def deploy(self):
+        try:
+            subprocess.run([
+                f'{PROJECT_DIR}/scripts/deploy.sh'
+            ], check=True, cwd=PROJECT_DIR)
+        except subprocess.CalledProcessError as e:
+            print(f"Deployment failed: {e}")
+
+if __name__ == '__main__':
+    server = HTTPServer(('0.0.0.0', WEBHOOK_PORT), WebhookHandler)
+    print(f"Webhook server starting on port {WEBHOOK_PORT}")
+    server.serve_forever()
 EOF
     
-    log_success "$context" "Runtime configuration created: $runtime_config"
-    echo "$runtime_config"
-    return 0
+    chmod +x "$script_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
+    log_success "$context" "Deploy webhook script generated"
 }
 
-# Generate Python scripts
-generate_python_scripts() {
+# Generate deployment script
+generate_deploy_script() {
     local context="$MODULE_CONTEXT"
-    local config_file="$1"
+    local script_path="$PROJECT_DIR/scripts/deploy.sh"
     
-    log_info "$context" "Generating Python scripts"
+    log_info "$context" "Generating deployment script"
     
-    if ! python3 "$GENERATOR_SCRIPT" "$config_file" --type python; then
-        log_error "$context" "Failed to generate Python scripts"
-        return 1
-    fi
+    mkdir -p "$(dirname "$script_path")"
     
-    log_success "$context" "Python scripts generated"
-    return 0
+    cat > "$script_path" << EOF
+#!/bin/bash
+# Ruuvi Home Deployment Script
+
+set -e
+
+PROJECT_DIR="${PROJECT_DIR}"
+LOG_FILE="${LOG_DIR}/deployment.log"
+
+log_deployment() {
+    echo "\$(date '+%Y-%m-%d %H:%M:%S') \$1" | tee -a "\$LOG_FILE"
 }
 
-# Generate shell scripts
-generate_shell_scripts() {
+log_deployment "Starting deployment..."
+
+# Pull latest changes
+cd "\$PROJECT_DIR"
+git fetch origin
+git reset --hard origin/main
+
+# Update Docker containers
+docker-compose pull
+docker-compose up -d --force-recreate
+
+log_deployment "Deployment completed successfully"
+EOF
+    
+    chmod +x "$script_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
+    log_success "$context" "Deployment script generated"
+}
+
+# Generate backup script
+generate_backup_script() {
     local context="$MODULE_CONTEXT"
-    local config_file="$1"
+    local script_path="$PROJECT_DIR/scripts/backup.sh"
     
-    log_info "$context" "Generating shell scripts"
+    log_info "$context" "Generating backup script"
     
-    if ! python3 "$GENERATOR_SCRIPT" "$config_file" --type shell; then
-        log_error "$context" "Failed to generate shell scripts"
-        return 1
-    fi
+    mkdir -p "$(dirname "$script_path")"
     
-    log_success "$context" "Shell scripts generated"
-    return 0
+    cat > "$script_path" << EOF
+#!/bin/bash
+# Ruuvi Home Backup Script
+
+set -e
+
+PROJECT_DIR="${PROJECT_DIR}"
+BACKUP_DIR="${BACKUP_DIR}"
+LOG_FILE="${LOG_DIR}/backup.log"
+
+log_backup() {
+    echo "\$(date '+%Y-%m-%d %H:%M:%S') \$1" | tee -a "\$LOG_FILE"
 }
 
-# Generate systemd services
+# Test mode
+if [ "\$1" = "--test" ]; then
+    log_backup "Backup test mode - checking prerequisites"
+    exit 0
+fi
+
+log_backup "Starting backup..."
+
+# Create backup filename with timestamp
+BACKUP_FILE="\$BACKUP_DIR/ruuvi_backup_\$(date +%Y%m%d_%H%M%S).sql.gz"
+
+# Backup database
+docker exec timescaledb pg_dump -U ruuvi ruuvi_home | gzip > "\$BACKUP_FILE"
+
+# Cleanup old backups (keep last 30 days)
+find "\$BACKUP_DIR" -name "ruuvi_backup_*.sql.gz" -mtime +30 -delete
+
+log_backup "Backup completed: \$BACKUP_FILE"
+EOF
+    
+    chmod +x "$script_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
+    log_success "$context" "Backup script generated"
+}
+
+# Generate environment file
+generate_env_file() {
+    local context="$MODULE_CONTEXT"
+    local env_path="$PROJECT_DIR/.env"
+    
+    log_info "$context" "Generating environment file"
+    
+    cat > "$env_path" << EOF
+# Ruuvi Home Environment Configuration
+# Generated by setup script
+
+# Database Configuration
+POSTGRES_USER=ruuvi
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+POSTGRES_DB=ruuvi_home
+DATABASE_URL=postgresql://ruuvi:${POSTGRES_PASSWORD}@timescaledb:5432/ruuvi_home
+
+# MQTT Configuration
+MQTT_HOST=mosquitto
+MQTT_PORT=1883
+MQTT_USERNAME=ruuvi
+MQTT_PASSWORD=${MQTT_PASSWORD}
+MQTT_BROKER_URL=mqtt://ruuvi:${MQTT_PASSWORD}@mosquitto:1883
+
+# API Configuration
+API_PORT=3000
+API_HOST=0.0.0.0
+RUST_LOG=info
+
+# Frontend Configuration
+FRONTEND_PORT=80
+REACT_APP_API_URL=http://localhost:3000
+
+# Webhook Configuration
+WEBHOOK_SECRET=${WEBHOOK_SECRET}
+WEBHOOK_PORT=${WEBHOOK_PORT}
+
+# Security
+JWT_SECRET=${JWT_SECRET}
+
+# System Configuration
+TZ=${TZ}
+LOG_FILEPATH=${LOG_DIR}/mqtt-reader.log
+
+# Docker Configuration
+TIMESCALEDB_TELEMETRY=off
+EOF
+    
+    chmod 600 "$env_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$env_path"
+    log_success "$context" "Environment file generated"
+}
+
+# Generate systemd service files
 generate_systemd_services() {
     local context="$MODULE_CONTEXT"
-    local config_file="$1"
     
     log_info "$context" "Generating systemd service files"
     
-    if ! python3 "$GENERATOR_SCRIPT" "$config_file" --type systemd; then
-        log_error "$context" "Failed to generate systemd services"
-        return 1
-    fi
+    # Ruuvi Home main service
+    cat > "/etc/systemd/system/ruuvi-home.service" << EOF
+[Unit]
+Description=Ruuvi Home Application
+Requires=docker.service
+After=docker.service network.target
+
+[Service]
+Type=forking
+RemainAfterExit=yes
+WorkingDirectory=${PROJECT_DIR}
+ExecStart=/usr/bin/docker-compose up -d
+ExecStop=/usr/bin/docker-compose down
+TimeoutStartSec=0
+User=${RUUVI_USER}
+Group=${RUUVI_USER}
+
+[Install]
+WantedBy=multi-user.target
+EOF
     
+    # Webhook service
+    cat > "/etc/systemd/system/ruuvi-webhook.service" << EOF
+[Unit]
+Description=Ruuvi Home Deployment Webhook
+After=network.target
+
+[Service]
+Type=simple
+User=${RUUVI_USER}
+Group=${RUUVI_USER}
+WorkingDirectory=${PROJECT_DIR}
+ExecStart=${PROJECT_DIR}/scripts/deploy-webhook.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    chmod 644 "/etc/systemd/system/ruuvi-home.service"
+    chmod 644 "/etc/systemd/system/ruuvi-webhook.service"
     log_success "$context" "Systemd services generated"
-    return 0
 }
-
-
 
 # Check for existing Mosquitto configuration
 check_existing_mosquitto_config() {
@@ -332,105 +492,6 @@ EOF
     return 0
 }
 
-
-
-# Generate configuration files
-generate_configuration_files() {
-    local context="$MODULE_CONTEXT"
-    local config_file="$1"
-    
-    log_info "$context" "Generating configuration files"
-    
-    if ! python3 "$GENERATOR_SCRIPT" "$config_file" --type config; then
-        log_error "$context" "Failed to generate configuration files"
-        return 1
-    fi
-    
-    log_success "$context" "Configuration files generated"
-    return 0
-}
-
-# Set proper permissions on generated files
-set_file_permissions() {
-    local context="$MODULE_CONTEXT"
-    
-    log_info "$context" "Setting file permissions"
-    
-    # Set permissions on scripts
-    if [ -d "$PROJECT_DIR/scripts" ]; then
-        find "$PROJECT_DIR/scripts" -name "*.py" -exec chmod 755 {} \;
-        find "$PROJECT_DIR/scripts" -name "*.sh" -exec chmod 755 {} \;
-        chown -R "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/scripts"
-    fi
-    
-    # Set permissions on configuration files
-    if [ -f "$PROJECT_DIR/.env" ]; then
-        chmod 600 "$PROJECT_DIR/.env"
-        chown "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/.env"
-    fi
-    
-    if [ -f "$PROJECT_DIR/docker-compose.yml" ]; then
-        chmod 644 "$PROJECT_DIR/docker-compose.yml"
-        chown "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/docker-compose.yml"
-    fi
-    
-    # Set permissions on systemd services
-    if [ -f "/etc/systemd/system/ruuvi-home.service" ]; then
-        chmod 644 "/etc/systemd/system/ruuvi-home.service"
-        chown root:root "/etc/systemd/system/ruuvi-home.service"
-    fi
-    
-    if [ -f "/etc/systemd/system/ruuvi-webhook.service" ]; then
-        chmod 644 "/etc/systemd/system/ruuvi-webhook.service"
-        chown root:root "/etc/systemd/system/ruuvi-webhook.service"
-    fi
-    
-    log_success "$context" "File permissions set"
-    return 0
-}
-
-# Validate generated files
-validate_generated_files() {
-    local context="$MODULE_CONTEXT"
-    local required_files=(
-        "$PROJECT_DIR/scripts/deploy-webhook.py"
-        "$PROJECT_DIR/scripts/deploy.sh"
-        "$PROJECT_DIR/scripts/backup.sh"
-        "$PROJECT_DIR/.env"
-        "$PROJECT_DIR/docker-compose.yml"
-        "/etc/systemd/system/ruuvi-home.service"
-        "/etc/systemd/system/ruuvi-webhook.service"
-    )
-    
-    log_info "$context" "Validating generated files"
-    
-    for file in "${required_files[@]}"; do
-        if [ ! -f "$file" ]; then
-            log_error "$context" "Required file not generated: $file"
-            return 1
-        fi
-        
-        # Basic syntax check for Python files
-        if [[ "$file" == *.py ]]; then
-            if ! python3 -m py_compile "$file"; then
-                log_error "$context" "Python syntax error in: $file"
-                return 1
-            fi
-        fi
-        
-        # Basic syntax check for shell files
-        if [[ "$file" == *.sh ]]; then
-            if ! bash -n "$file"; then
-                log_error "$context" "Shell syntax error in: $file"
-                return 1
-            fi
-        fi
-    done
-    
-    log_success "$context" "All generated files validated"
-    return 0
-}
-
 # Handle Mosquitto configuration migration
 handle_mosquitto_migration() {
     local context="$MODULE_CONTEXT"
@@ -491,17 +552,122 @@ handle_mosquitto_migration() {
     return 0
 }
 
+# Generate all required files
+generate_all_required_files() {
+    local context="$MODULE_CONTEXT"
+    local generators=(
+        "generate_deploy_webhook_script:Deploy webhook script"
+        "generate_deploy_script:Deployment script"
+        "generate_backup_script:Backup script"
+        "generate_env_file:Environment file"
+        "generate_systemd_services:Systemd services"
+    )
+    
+    log_info "$context" "Generating all required files"
+    
+    local failed_generators=()
+    
+    for generator_entry in "${generators[@]}"; do
+        local func_name="${generator_entry%:*}"
+        local desc="${generator_entry#*:}"
+        
+        log_info "$context" "Generating: $desc"
+        
+        if ! $func_name; then
+            failed_generators+=("$desc")
+        fi
+    done
+    
+    if [ ${#failed_generators[@]} -gt 0 ]; then
+        log_error "$context" "Failed to generate: ${failed_generators[*]}"
+        return 1
+    fi
+    
+    log_success "$context" "All files generated successfully"
+    return 0
+}
+
+# Set proper permissions on generated files
+set_file_permissions() {
+    local context="$MODULE_CONTEXT"
+    
+    log_info "$context" "Setting file permissions"
+    
+    # Set permissions on scripts
+    if [ -d "$PROJECT_DIR/scripts" ]; then
+        find "$PROJECT_DIR/scripts" -name "*.py" -exec chmod 755 {} \;
+        find "$PROJECT_DIR/scripts" -name "*.sh" -exec chmod 755 {} \;
+        chown -R "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/scripts"
+    fi
+    
+    # Set permissions on configuration files
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        chmod 600 "$PROJECT_DIR/.env"
+        chown "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/.env"
+    fi
+    
+    # Set permissions on systemd services
+    if [ -f "/etc/systemd/system/ruuvi-home.service" ]; then
+        chmod 644 "/etc/systemd/system/ruuvi-home.service"
+        chown root:root "/etc/systemd/system/ruuvi-home.service"
+    fi
+    
+    if [ -f "/etc/systemd/system/ruuvi-webhook.service" ]; then
+        chmod 644 "/etc/systemd/system/ruuvi-webhook.service"
+        chown root:root "/etc/systemd/system/ruuvi-webhook.service"
+    fi
+    
+    log_success "$context" "File permissions set"
+    return 0
+}
+
+# Validate generated files
+validate_generated_files() {
+    local context="$MODULE_CONTEXT"
+    local required_files=(
+        "$PROJECT_DIR/scripts/deploy-webhook.py"
+        "$PROJECT_DIR/scripts/deploy.sh"
+        "$PROJECT_DIR/scripts/backup.sh"
+        "$PROJECT_DIR/.env"
+        "/etc/systemd/system/ruuvi-home.service"
+        "/etc/systemd/system/ruuvi-webhook.service"
+    )
+    
+    log_info "$context" "Validating generated files"
+    
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            log_error "$context" "Required file not generated: $file"
+            return 1
+        fi
+        
+        # Basic syntax check for Python files
+        if [[ "$file" == *.py ]]; then
+            if ! python3 -m py_compile "$file"; then
+                log_error "$context" "Python syntax error in: $file"
+                return 1
+            fi
+        fi
+        
+        # Basic syntax check for shell files
+        if [[ "$file" == *.sh ]]; then
+            if ! bash -n "$file"; then
+                log_error "$context" "Shell syntax error in: $file"
+                return 1
+            fi
+        fi
+    done
+    
+    log_success "$context" "All generated files validated"
+    return 0
+}
+
 # Main file generation function
 setup_file_generation() {
     local context="$MODULE_CONTEXT"
     local setup_steps=(
-        "install_generator_dependencies:Install generator dependencies"
-        "create_runtime_config:Create runtime configuration"
         "handle_mosquitto_migration:Handle Mosquitto migration"
-        "generate_python_scripts:Generate Python scripts"
-        "generate_shell_scripts:Generate shell scripts"
-        "generate_systemd_services:Generate systemd services"
-        "generate_configuration_files:Generate configuration files"
+        "generate_all_required_files:Generate all required files"
         "set_file_permissions:Set file permissions"
         "validate_generated_files:Validate generated files"
     )
@@ -512,7 +678,6 @@ setup_file_generation() {
     local step_num=1
     local total_steps=${#setup_steps[@]}
     local failed_steps=()
-    local runtime_config=""
     
     for step in "${setup_steps[@]}"; do
         local func_name="${step%:*}"
@@ -520,38 +685,12 @@ setup_file_generation() {
         
         log_step "$step_num" "$total_steps" "$step_desc"
         
-        case "$func_name" in
-            "create_runtime_config")
-                if runtime_config=$(create_runtime_config); then
-                    log_debug "$context" "Runtime config: $runtime_config"
-                else
-                    failed_steps+=("$step_desc")
-                fi
-                ;;
-            "generate_python_scripts"|"generate_shell_scripts"|"generate_systemd_services"|"generate_configuration_files")
-                if [ -n "$runtime_config" ]; then
-                    if ! $func_name "$runtime_config"; then
-                        failed_steps+=("$step_desc")
-                    fi
-                else
-                    log_error "$context" "Runtime config not available for $func_name"
-                    failed_steps+=("$step_desc")
-                fi
-                ;;
-            *)
-                if ! $func_name; then
-                    failed_steps+=("$step_desc")
-                fi
-                ;;
-        esac
+        if ! $func_name; then
+            failed_steps+=("$step_desc")
+        fi
         
         ((step_num++))
     done
-    
-    # Cleanup runtime config
-    if [ -n "$runtime_config" ] && [ -f "$runtime_config" ]; then
-        rm -f "$runtime_config"
-    fi
     
     if [ ${#failed_steps[@]} -gt 0 ]; then
         log_error "$context" "File generation failed at: ${failed_steps[*]}"
