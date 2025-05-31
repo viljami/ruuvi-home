@@ -430,7 +430,7 @@ show_monitoring_status() {
     # Show available monitoring tools
     echo ""
     echo "=== Available Monitoring Tools ==="
-    local tools=("htop" "iotop" "nethogs" "ncdu" "docker" "docker-compose")
+    local tools=("htop" "iotop" "nethogs" "ncdu" "docker")
     for tool in "${tools[@]}"; do
         if command -v "$tool" &>/dev/null; then
             echo "  ✓ $tool"
@@ -438,6 +438,15 @@ show_monitoring_status() {
             echo "  ✗ $tool (not installed)"
         fi
     done
+    
+    # Special check for Docker Compose (plugin vs standalone)
+    if command -v docker-compose &>/dev/null; then
+        echo "  ✓ docker-compose (standalone)"
+    elif command -v docker &>/dev/null && docker compose version &>/dev/null 2>&1; then
+        echo "  ✓ docker compose (plugin)"
+    else
+        echo "  ✗ docker-compose (not available)"
+    fi
     echo ""
 }
 

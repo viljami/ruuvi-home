@@ -134,13 +134,70 @@ log_deployment() {
 log_deployment "Starting deployment..."
 
 # Pull latest changes
-cd "\$PROJECT_DIR"
+cd "$PROJECT_DIR"
 git fetch origin
 git reset --hard origin/main
 
-# Update Docker containers
-docker-compose pull
-docker-compose up -d --force-recreate
+# Ensure frontend public directory exists with required files
+if [ ! -f "frontend/public/index.html" ]; then
+    log_deployment "Creating missing frontend files..."
+    mkdir -p frontend/public
+    
+    # Create basic index.html if missing
+    cat > frontend/public/index.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Ruuvi Home - Monitor your Ruuvi sensors from home" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+    <title>Ruuvi Home</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
+</html>
+HTMLEOF
+    
+    # Create basic manifest.json if missing
+    if [ ! -f "frontend/public/manifest.json" ]; then
+        cat > frontend/public/manifest.json << 'JSONEOF'
+{
+  "short_name": "Ruuvi Home",
+  "name": "Ruuvi Home - Sensor Dashboard",
+  "description": "Monitor your Ruuvi sensors in real-time",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#f5f5f5"
+}
+JSONEOF
+    fi
+    
+    log_deployment "Frontend files created"
+fi
+
+# Build and update Docker containers
+log_deployment "Building Docker images..."
+docker compose build --no-cache
+
+log_deployment "Starting services..."
+docker compose up -d --force-recreate
+
+# Wait for services to be ready
+log_deployment "Waiting for services to be ready..."
+sleep 30
+
+# Verify services are running
+if docker compose ps | grep -q "Up"; then
+    log_deployment "Services started successfully"
+else
+    log_deployment "Warning: Some services may not have started properly"
+fi
 
 log_deployment "Deployment completed successfully"
 EOF
