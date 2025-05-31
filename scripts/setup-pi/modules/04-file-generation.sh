@@ -140,6 +140,200 @@ generate_systemd_services() {
     return 0
 }
 
+
+
+# Check for existing Mosquitto configuration
+check_existing_mosquitto_config() {
+    local context="$MODULE_CONTEXT"
+    
+    log_info "$context" "Checking for existing Mosquitto configuration"
+    
+    # Common locations for Mosquitto config
+    local mosquitto_configs=(
+        "/etc/mosquitto/mosquitto.conf"
+        "/etc/mosquitto/conf.d"
+        "/var/lib/mosquitto"
+    )
+    
+    local found_configs=()
+    
+    for config_path in "${mosquitto_configs[@]}"; do
+        if [ -e "$config_path" ]; then
+            found_configs+=("$config_path")
+        fi
+    done
+    
+    if [ ${#found_configs[@]} -gt 0 ]; then
+        log_info "$context" "Found existing Mosquitto configuration:"
+        for config in "${found_configs[@]}"; do
+            log_info "$context" "  - $config"
+        done
+        return 0
+    else
+        log_info "$context" "No existing Mosquitto configuration found"
+        return 1
+    fi
+}
+
+# Migrate existing Mosquitto configuration
+migrate_mosquitto_config() {
+    local context="$MODULE_CONTEXT"
+    local backup_existing="${1:-true}"
+    
+    log_info "$context" "Migrating existing Mosquitto configuration"
+    
+    # Create backup directory
+    local backup_dir="$PROJECT_DIR/config/mosquitto-backup"
+    mkdir -p "$backup_dir"
+    chown "$RUUVI_USER:$RUUVI_USER" "$backup_dir"
+    
+    # Backup existing configuration
+    if [ "$backup_existing" = "true" ]; then
+        log_info "$context" "Backing up existing Mosquitto configuration"
+        
+        if [ -f "/etc/mosquitto/mosquitto.conf" ]; then
+            cp "/etc/mosquitto/mosquitto.conf" "$backup_dir/mosquitto.conf.backup"
+            log_info "$context" "Backed up main config to $backup_dir/mosquitto.conf.backup"
+        fi
+        
+        if [ -d "/etc/mosquitto/conf.d" ]; then
+            cp -r "/etc/mosquitto/conf.d" "$backup_dir/"
+            log_info "$context" "Backed up config directory to $backup_dir/conf.d/"
+        fi
+        
+        if [ -d "/var/lib/mosquitto" ]; then
+            # Only backup small config files, not large data files
+            find "/var/lib/mosquitto" -name "*.conf" -o -name "*.acl" -o -name "*.passwd" | while read -r file; do
+                cp "$file" "$backup_dir/"
+            done
+            log_info "$context" "Backed up Mosquitto data configs to $backup_dir/"
+        fi
+    fi
+    
+    # Create enhanced Mosquitto configuration
+    local mosquitto_conf="$PROJECT_DIR/config/mosquitto/mosquitto.conf"
+    mkdir -p "$(dirname "$mosquitto_conf")"
+    
+    cat > "$mosquitto_conf" << 'EOF'
+# Mosquitto MQTT Broker configuration for Ruuvi Home
+# Enhanced configuration with migration from existing setup
+
+# Basic listener configuration
+listener 1883 0.0.0.0
+protocol mqtt
+
+# WebSockets listener for web UI integration
+listener 9001 0.0.0.0
+protocol websockets
+
+# Authentication and security
+allow_anonymous true
+# To enable authentication, uncomment and configure:
+# allow_anonymous false
+# password_file /mosquitto/config/passwd
+# acl_file /mosquitto/config/acl
+
+# Persistence settings
+persistence true
+persistence_location /mosquitto/data/
+autosave_interval 1800
+
+# Logging configuration
+log_dest file /mosquitto/log/mosquitto.log
+log_dest stdout
+log_timestamp true
+log_type error
+log_type warning
+log_type notice
+log_type information
+connection_messages true
+
+# Performance and limits
+max_connections -1
+max_queued_messages 1000
+max_inflight_messages 20
+message_size_limit 268435456
+
+# Ruuvi Gateway compatibility
+# Common topic patterns used by Ruuvi gateways:
+# - ruuvi/+/data
+# - ruuvi/gateway/+
+# - homeassistant/sensor/+
+
+# Keep alive settings
+keepalive_interval 60
+EOF
+    
+    # If password file exists, create a template
+    if [ -f "/etc/mosquitto/passwd" ] || [ -f "$backup_dir/passwd" ]; then
+        log_info "$context" "Creating password file template"
+        cat > "$PROJECT_DIR/config/mosquitto/passwd" << 'EOF'
+# Mosquitto password file
+# Generate passwords with: mosquitto_passwd -c passwd username
+# Add users with: mosquitto_passwd passwd username
+EOF
+        
+        # Copy existing passwords if available
+        if [ -f "/etc/mosquitto/passwd" ]; then
+            cat "/etc/mosquitto/passwd" >> "$PROJECT_DIR/config/mosquitto/passwd"
+            log_info "$context" "Migrated existing password file"
+        elif [ -f "$backup_dir/passwd" ]; then
+            cat "$backup_dir/passwd" >> "$PROJECT_DIR/config/mosquitto/passwd"
+            log_info "$context" "Restored password file from backup"
+        fi
+        
+        # Update main config to use password file
+        sed -i 's/allow_anonymous true/allow_anonymous false/' "$mosquitto_conf"
+        sed -i 's/# password_file/password_file/' "$mosquitto_conf"
+    fi
+    
+    # If ACL file exists, create a template
+    if [ -f "/etc/mosquitto/acl" ] || [ -f "$backup_dir/acl" ]; then
+        log_info "$context" "Creating ACL file template"
+        cat > "$PROJECT_DIR/config/mosquitto/acl" << 'EOF'
+# Mosquitto Access Control List
+# Format: topic [read|write] <topic>
+#         user <username>
+
+# Allow all users to access Ruuvi topics
+topic readwrite ruuvi/#
+topic readwrite homeassistant/#
+
+# Admin user with full access
+user admin
+topic readwrite #
+EOF
+        
+        # Copy existing ACL if available
+        if [ -f "/etc/mosquitto/acl" ]; then
+            echo "# --- Migrated from existing configuration ---" >> "$PROJECT_DIR/config/mosquitto/acl"
+            cat "/etc/mosquitto/acl" >> "$PROJECT_DIR/config/mosquitto/acl"
+            log_info "$context" "Migrated existing ACL file"
+        elif [ -f "$backup_dir/acl" ]; then
+            echo "# --- Restored from backup ---" >> "$PROJECT_DIR/config/mosquitto/acl"
+            cat "$backup_dir/acl" >> "$PROJECT_DIR/config/mosquitto/acl"
+            log_info "$context" "Restored ACL file from backup"
+        fi
+        
+        # Update main config to use ACL file
+        sed -i 's/# acl_file/acl_file/' "$mosquitto_conf"
+    fi
+    
+    # Set proper ownership
+    chown -R "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/config/mosquitto"
+    chmod 644 "$mosquitto_conf"
+    [ -f "$PROJECT_DIR/config/mosquitto/passwd" ] && chmod 600 "$PROJECT_DIR/config/mosquitto/passwd"
+    [ -f "$PROJECT_DIR/config/mosquitto/acl" ] && chmod 644 "$PROJECT_DIR/config/mosquitto/acl"
+    
+    log_success "$context" "Mosquitto configuration migrated successfully"
+    log_info "$context" "Original configuration backed up to: $backup_dir"
+    log_info "$context" "New configuration: $mosquitto_conf"
+    
+    return 0
+}
+
+
+
 # Generate configuration files
 generate_configuration_files() {
     local context="$MODULE_CONTEXT"
@@ -237,12 +431,73 @@ validate_generated_files() {
     return 0
 }
 
+# Handle Mosquitto configuration migration
+handle_mosquitto_migration() {
+    local context="$MODULE_CONTEXT"
+    
+    if check_existing_mosquitto_config; then
+        echo ""
+        echo "=========================================="
+        echo "   Existing Mosquitto Configuration"
+        echo "=========================================="
+        echo ""
+        echo "An existing Mosquitto MQTT broker configuration was found on this system."
+        echo "This configuration may contain important settings for your Ruuvi Gateway."
+        echo ""
+        echo "Options:"
+        echo "  1) Migrate existing configuration (Recommended)"
+        echo "     - Backup current config and integrate it with Ruuvi Home"
+        echo "     - Preserve authentication, ACLs, and custom settings"
+        echo ""
+        echo "  2) Use default Ruuvi Home configuration"
+        echo "     - Start fresh with standard settings"
+        echo "     - You can manually configure later if needed"
+        echo ""
+        
+        while true; do
+            read -p "Would you like to migrate your existing Mosquitto configuration? (y/N): " response
+            case "$response" in
+                [Yy]|[Yy][Ee][Ss])
+                    log_info "$context" "User chose to migrate existing configuration"
+                    if migrate_mosquitto_config true; then
+                        echo ""
+                        echo "✓ Mosquitto configuration migrated successfully!"
+                        echo "  - Original config backed up to: $PROJECT_DIR/config/mosquitto-backup/"
+                        echo "  - Enhanced config created at: $PROJECT_DIR/config/mosquitto/"
+                        echo ""
+                    else
+                        log_error "$context" "Failed to migrate Mosquitto configuration"
+                        return 1
+                    fi
+                    break
+                    ;;
+                [Nn]|[Nn][Oo]|"")
+                    log_info "$context" "User chose to use default configuration"
+                    echo ""
+                    echo "Using default Ruuvi Home Mosquitto configuration."
+                    echo "Your existing config is preserved and can be manually integrated later."
+                    echo ""
+                    break
+                    ;;
+                *)
+                    echo "Please answer yes (y) or no (n)."
+                    ;;
+            esac
+        done
+    else
+        log_info "$context" "No existing Mosquitto configuration found, using defaults"
+    fi
+    
+    return 0
+}
+
 # Main file generation function
 setup_file_generation() {
     local context="$MODULE_CONTEXT"
     local setup_steps=(
         "install_generator_dependencies:Install generator dependencies"
         "create_runtime_config:Create runtime configuration"
+        "handle_mosquitto_migration:Handle Mosquitto migration"
         "generate_python_scripts:Generate Python scripts"
         "generate_shell_scripts:Generate shell scripts"
         "generate_systemd_services:Generate systemd services"
