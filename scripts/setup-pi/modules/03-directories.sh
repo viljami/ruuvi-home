@@ -347,9 +347,9 @@ validate_directory_structure() {
         return 1
     fi
     
-    # Check if docker-compose.yml exists
-    if [ ! -f "$PROJECT_DIR/docker-compose.yml" ]; then
-        log_error "$context" "docker-compose.yml not found in project directory"
+    # Check if docker-compose.yaml exists
+    if [ ! -f "$PROJECT_DIR/docker-compose.yaml" ]; then
+        log_error "$context" "docker-compose.yaml not found in project directory"
         return 1
     fi
     
