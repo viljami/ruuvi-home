@@ -123,7 +123,7 @@ validate_script_environment() {
     log_info "$context" "Validating script environment"
     
     # Check required directories
-    for dir in "$LIB_DIR" "$CONFIG_DIR" "$MODULE_DIR"; do
+    for dir in "$LIB_DIR" "$MODULE_DIR" "$TEMPLATE_DIR"; do
         if [ ! -d "$dir" ]; then
             missing_deps+=("Directory: $dir")
         fi
@@ -136,11 +136,6 @@ validate_script_environment() {
             missing_deps+=("Library: $lib")
         fi
     done
-    
-    # Check configuration file
-    if [ ! -f "$CONFIG_DIR/setup.env" ]; then
-        missing_deps+=("Config: setup.env")
-    fi
     
     if [ ${#missing_deps[@]} -gt 0 ]; then
         log_error "$context" "Missing dependencies: ${missing_deps[*]}"
