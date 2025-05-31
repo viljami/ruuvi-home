@@ -39,22 +39,45 @@ generate_secure_passwords() {
     log_info "$context" "Passwords will be saved to .env file during setup"
 }
 
-# Load configuration from YAML
+# Load configuration variables
 load_config() {
-    local config_file="$CONFIG_DIR/config.yaml"
-    
-    if [ ! -f "$config_file" ]; then
-        log_error "$MAIN_CONTEXT" "Configuration file not found: $config_file"
-        exit 1
-    fi
-    
-    # Export key variables for modules
+    # Export key variables for modules (no YAML dependency for now)
     export RUUVI_USER="${SUDO_USER:-pi}"
     export PROJECT_DIR="/home/$RUUVI_USER/ruuvi-home"
     export DATA_DIR="$PROJECT_DIR/data"
     export LOG_DIR="/var/log/ruuvi-home"
     export BACKUP_DIR="$PROJECT_DIR/backups"
-    export CONFIG_YAML="$config_file"
+    
+    # Configuration defaults
+    export WEBHOOK_PORT="${WEBHOOK_PORT:-9000}"
+    export FRONTEND_PORT="${FRONTEND_PORT:-80}"
+    export API_PORT="${API_PORT:-3000}"
+    export DB_PORT="${DB_PORT:-5432}"
+    export DB_USER="${DB_USER:-ruuvi}"
+    export DB_NAME="${DB_NAME:-ruuvi_home}"
+    export MOSQUITTO_PORT="${MOSQUITTO_PORT:-1883}"
+    export TZ="${TZ:-Europe/Helsinki}"
+    export LOG_LEVEL="${LOG_LEVEL:-info}"
+    
+    # Feature flags
+    export ENABLE_FISH_SHELL="${ENABLE_FISH_SHELL:-true}"
+    export ENABLE_BACKUP_CRON="${ENABLE_BACKUP_CRON:-true}"
+    export ENABLE_MONITORING="${ENABLE_MONITORING:-true}"
+    export ENABLE_FIREWALL="${ENABLE_FIREWALL:-true}"
+    
+    # Backup configuration
+    export BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
+    export BACKUP_SCHEDULE="${BACKUP_SCHEDULE:-0 2 * * *}"
+    
+    # Docker configuration
+    export DOCKER_LOG_MAX_SIZE="${DOCKER_LOG_MAX_SIZE:-10m}"
+    export DOCKER_LOG_MAX_FILE="${DOCKER_LOG_MAX_FILE:-3}"
+    
+    # Colors for output
+    export COLOR_GREEN='\033[0;32m'
+    export COLOR_YELLOW='\033[1;33m'
+    export COLOR_RED='\033[0;31m'
+    export COLOR_NC='\033[0m'
 }
 
 # Initialize configuration
@@ -87,7 +110,7 @@ print_header() {
     
     log_info "$context" "Setup target user: $RUUVI_USER"
     log_info "$context" "Project directory: $PROJECT_DIR"
-    log_info "$context" "Configuration: $CONFIG_YAML"
+    log_info "$context" "Configuration: Built-in defaults with environment overrides"
     
     # Generate secure passwords if not already provided
     generate_secure_passwords
@@ -169,7 +192,7 @@ execute_module() {
     
     # Set up module environment
     export SCRIPT_DIR MODULE_DIR LIB_DIR CONFIG_DIR TEMPLATE_DIR
-    export RUUVI_USER PROJECT_DIR DATA_DIR LOG_DIR BACKUP_DIR CONFIG_YAML
+    export RUUVI_USER PROJECT_DIR DATA_DIR LOG_DIR BACKUP_DIR
     export POSTGRES_PASSWORD MQTT_PASSWORD WEBHOOK_SECRET JWT_SECRET SESSION_SECRET
     
     # Execute module with error handling
