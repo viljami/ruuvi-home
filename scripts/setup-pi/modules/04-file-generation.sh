@@ -257,6 +257,25 @@ generate_systemd_services() {
     
     log_info "$context" "Generating systemd service files"
     
+    # Detect Docker Compose command and get full path
+    local docker_compose_start_cmd
+    local docker_compose_stop_cmd
+    
+    if command -v docker-compose &> /dev/null; then
+        local compose_path=$(command -v docker-compose)
+        docker_compose_start_cmd="$compose_path up -d"
+        docker_compose_stop_cmd="$compose_path down"
+        log_info "$context" "Using docker-compose at: $compose_path"
+    elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+        local docker_path=$(command -v docker)
+        docker_compose_start_cmd="$docker_path compose up -d"
+        docker_compose_stop_cmd="$docker_path compose down"
+        log_info "$context" "Using docker compose plugin at: $docker_path"
+    else
+        log_error "$context" "Neither docker-compose nor docker compose found"
+        return 1
+    fi
+    
     # Ruuvi Home main service
     cat > "/etc/systemd/system/ruuvi-home.service" << EOF
 [Unit]
@@ -268,8 +287,8 @@ After=docker.service network.target
 Type=forking
 RemainAfterExit=yes
 WorkingDirectory=${PROJECT_DIR}
-ExecStart=/usr/bin/docker-compose up -d
-ExecStop=/usr/bin/docker-compose down
+ExecStart=${docker_compose_start_cmd}
+ExecStop=${docker_compose_stop_cmd}
 TimeoutStartSec=0
 User=${RUUVI_USER}
 Group=${RUUVI_USER}
@@ -300,6 +319,229 @@ EOF
     chmod 644 "/etc/systemd/system/ruuvi-home.service"
     chmod 644 "/etc/systemd/system/ruuvi-webhook.service"
     log_success "$context" "Systemd services generated"
+}
+
+# Generate health check script
+generate_health_check_script() {
+    local context="$MODULE_CONTEXT"
+    local script_path="$PROJECT_DIR/scripts/health-check.py"
+    
+    log_info "$context" "Generating health check script"
+    
+    mkdir -p "$(dirname "$script_path")"
+    
+    cat > "$script_path" << EOF
+#!/usr/bin/env python3
+"""
+Ruuvi Home Health Check Script
+Monitors system and service health
+"""
+
+import os
+import sys
+import time
+import subprocess
+import json
+from datetime import datetime
+
+# Configuration
+PROJECT_DIR = '${PROJECT_DIR}'
+LOG_FILE = '${LOG_DIR}/health-check.log'
+
+def log_health(level, message):
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    with open(LOG_FILE, 'a') as f:
+        f.write(f"[{timestamp}] [{level}] {message}\n")
+
+def check_docker_services():
+    """Check if Docker services are running"""
+    try:
+        # Try docker compose first, then docker-compose
+        try:
+            result = subprocess.run(['docker', 'compose', 'ps', '--format', 'json'], 
+                                  cwd=PROJECT_DIR, capture_output=True, text=True)
+        except FileNotFoundError:
+            result = subprocess.run(['docker-compose', 'ps', '--format', 'json'], 
+                                  cwd=PROJECT_DIR, capture_output=True, text=True)
+        if result.returncode == 0:
+            services = []
+            for line in result.stdout.strip().split('\n'):
+                if line:
+                    services.append(json.loads(line))
+            
+            running_services = [s for s in services if s.get('State') == 'running']
+            log_health('INFO', f"Docker services: {len(running_services)}/{len(services)} running")
+            return len(running_services) == len(services)
+        else:
+            log_health('ERROR', 'Failed to check Docker services')
+            return False
+    except Exception as e:
+        log_health('ERROR', f'Docker service check failed: {e}')
+        return False
+
+def check_disk_space():
+    """Check available disk space"""
+    try:
+        result = subprocess.run(['df', PROJECT_DIR], capture_output=True, text=True)
+        if result.returncode == 0:
+            lines = result.stdout.strip().split('\n')
+            if len(lines) > 1:
+                fields = lines[1].split()
+                available = int(fields[3])
+                total = int(fields[1])
+                usage_percent = ((total - available) / total) * 100
+                log_health('INFO', f"Disk usage: {usage_percent:.1f}%")
+                return usage_percent < 90
+        return False
+    except Exception as e:
+        log_health('ERROR', f'Disk space check failed: {e}')
+        return False
+
+def main():
+    log_health('INFO', 'Starting health check')
+    
+    checks = [
+        ('Docker Services', check_docker_services),
+        ('Disk Space', check_disk_space),
+    ]
+    
+    failed_checks = []
+    for name, check_func in checks:
+        if not check_func():
+            failed_checks.append(name)
+    
+    if failed_checks:
+        log_health('WARN', f'Failed checks: {", ".join(failed_checks)}')
+        sys.exit(1)
+    else:
+        log_health('INFO', 'All health checks passed')
+        sys.exit(0)
+
+if __name__ == '__main__':
+    main()
+EOF
+    
+    chmod +x "$script_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
+    log_success "$context" "Health check script generated"
+}
+
+# Generate monitor script
+generate_monitor_script() {
+    local context="$MODULE_CONTEXT"
+    local script_path="$PROJECT_DIR/scripts/monitor.sh"
+    
+    log_info "$context" "Generating monitor script"
+    
+    mkdir -p "$(dirname "$script_path")"
+    
+    cat > "$script_path" << EOF
+#!/bin/bash
+# Ruuvi Home System Monitor Script
+
+PROJECT_DIR="${PROJECT_DIR}"
+LOG_FILE="${LOG_DIR}/monitoring.log"
+
+log_monitor() {
+    echo "\$(date '+%Y-%m-%d %H:%M:%S') \$1" >> "\$LOG_FILE"
+}
+
+# Check CPU usage
+cpu_usage=\$(top -bn1 | grep "Cpu(s)" | awk '{print \$2}' | cut -d'%' -f1)
+log_monitor "CPU Usage: \${cpu_usage}%"
+
+# Check memory usage
+memory_info=\$(free | grep Mem)
+total_mem=\$(echo \$memory_info | awk '{print \$2}')
+used_mem=\$(echo \$memory_info | awk '{print \$3}')
+mem_percent=\$(( (used_mem * 100) / total_mem ))
+log_monitor "Memory Usage: \${mem_percent}%"
+
+# Check disk usage
+disk_usage=\$(df \$PROJECT_DIR | tail -1 | awk '{print \$5}' | cut -d'%' -f1)
+log_monitor "Disk Usage: \${disk_usage}%"
+
+# Check Docker containers
+if command -v docker >/dev/null 2>&1; then
+    container_count=\$(docker ps --format "table {{.Names}}" | tail -n +2 | wc -l)
+    log_monitor "Running containers: \$container_count"
+fi
+
+log_monitor "System monitoring completed"
+EOF
+    
+    chmod +x "$script_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
+    log_success "$context" "Monitor script generated"
+}
+
+# Generate maintenance script
+generate_maintenance_script() {
+    local context="$MODULE_CONTEXT"
+    local script_path="$PROJECT_DIR/scripts/maintenance.sh"
+    
+    log_info "$context" "Generating maintenance script"
+    
+    mkdir -p "$(dirname "$script_path")"
+    
+    cat > "$script_path" << EOF
+#!/bin/bash
+# Ruuvi Home Maintenance Script
+
+PROJECT_DIR="${PROJECT_DIR}"
+LOG_FILE="${LOG_DIR}/maintenance.log"
+
+log_maintenance() {
+    echo "\$(date '+%Y-%m-%d %H:%M:%S') \$1" | tee -a "\$LOG_FILE"
+}
+
+cleanup() {
+    log_maintenance "Starting cleanup tasks"
+    
+    # Clean Docker images and containers
+    if command -v docker >/dev/null 2>&1; then
+        log_maintenance "Cleaning unused Docker resources"
+        docker system prune -f >/dev/null 2>&1 || true
+    fi
+    
+    # Clean old log files (keep last 30 days)
+    find "${LOG_DIR}" -name "*.log" -mtime +30 -delete 2>/dev/null || true
+    
+    log_maintenance "Cleanup completed"
+}
+
+update() {
+    log_maintenance "Checking for system updates"
+    
+    # Update package lists
+    apt-get update -qq >/dev/null 2>&1 || true
+    
+    # List available updates
+    updates=\$(apt list --upgradable 2>/dev/null | wc -l)
+    if [ "\$updates" -gt 1 ]; then
+        log_maintenance "\$((updates - 1)) package updates available"
+    else
+        log_maintenance "System is up to date"
+    fi
+}
+
+case "\$1" in
+    cleanup)
+        cleanup
+        ;;
+    update)
+        update
+        ;;
+    *)
+        echo "Usage: \$0 {cleanup|update}"
+        exit 1
+        ;;
+esac
+EOF
+    
+    chmod +x "$script_path"
+    chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
+    log_success "$context" "Maintenance script generated"
 }
 
 # Check for existing Mosquitto configuration
@@ -561,6 +803,9 @@ generate_all_required_files() {
         "generate_backup_script:Backup script"
         "generate_env_file:Environment file"
         "generate_systemd_services:Systemd services"
+        "generate_health_check_script:Health check script"
+        "generate_monitor_script:Monitor script"
+        "generate_maintenance_script:Maintenance script"
     )
     
     log_info "$context" "Generating all required files"
@@ -631,6 +876,9 @@ validate_generated_files() {
         "$PROJECT_DIR/.env"
         "/etc/systemd/system/ruuvi-home.service"
         "/etc/systemd/system/ruuvi-webhook.service"
+        "$PROJECT_DIR/scripts/health-check.py"
+        "$PROJECT_DIR/scripts/monitor.sh"
+        "$PROJECT_DIR/scripts/maintenance.sh"
     )
     
     log_info "$context" "Validating generated files"
