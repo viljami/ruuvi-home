@@ -93,6 +93,49 @@ start_services() {
     local context="$MODULE_CONTEXT"
     
     log_info "$context" "Starting systemd services"
+    log_info "$context" "Deployment mode: ${DEPLOYMENT_MODE:-local}"
+    
+    # For registry mode, ensure images are available
+    if [ "${DEPLOYMENT_MODE}" = "registry" ]; then
+        log_info "$context" "Registry mode: Verifying image availability"
+        
+        # Check if required images exist or can be pulled
+        local compose_file="${DOCKER_COMPOSE_FILE:-docker-compose.yaml}"
+        if [ -f "$PROJECT_DIR/$compose_file" ]; then
+            log_info "$context" "Pre-pulling images for registry deployment"
+            cd "$PROJECT_DIR"
+            
+            # Try to pull images with detailed error handling
+            local pull_output
+            if pull_output=$(sudo -u "$RUUVI_USER" docker compose -f "$compose_file" pull 2>&1); then
+                log_success "$context" "Successfully pulled all required images"
+            else
+                log_error "$context" "Failed to pull images from registry"
+                log_error "$context" "Pull output: $pull_output"
+                
+                # Check if any images are available locally
+                local available_images
+                if available_images=$(sudo -u "$RUUVI_USER" docker compose -f "$compose_file" images -q 2>/dev/null); then
+                    if [ -n "$available_images" ]; then
+                        log_warn "$context" "Some images available locally, attempting to start with existing images"
+                    else
+                        log_error "$context" "No images available locally or from registry"
+                        log_error "$context" "Please check:"
+                        log_error "$context" "  1. Network connectivity to ${GITHUB_REGISTRY:-ghcr.io}"
+                        log_error "$context" "  2. GitHub repository: ${GITHUB_REPO:-not-set}"
+                        log_error "$context" "  3. Image tag: ${IMAGE_TAG:-latest}"
+                        return 1
+                    fi
+                else
+                    log_error "$context" "Cannot determine image availability"
+                    return 1
+                fi
+            fi
+        else
+            log_error "$context" "Compose file not found: $PROJECT_DIR/$compose_file"
+            return 1
+        fi
+    fi
     
     # Start services in dependency order
     local ordered_services=("ruuvi-home.service" "ruuvi-webhook.service")
@@ -233,9 +276,9 @@ show_service_status() {
     done
     
     echo "=== Service Ports ==="
-    echo "Frontend (HTTP): http://$(hostname -I | awk '{print $1}'):80"
-    echo "API: http://$(hostname -I | awk '{print $1}'):3000"
-    echo "Webhook: http://$(hostname -I | awk '{print $1}'):9000"
+    echo "Frontend (HTTP): http://$(hostname -I | awk '{print $1}'):${FRONTEND_PORT:-80}"
+    echo "API: http://$(hostname -I | awk '{print $1}'):${API_PORT:-8080}"
+    echo "Webhook: http://$(hostname -I | awk '{print $1}'):${WEBHOOK_PORT:-9000}"
     echo ""
 }
 

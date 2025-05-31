@@ -38,6 +38,98 @@ generate_secure_passwords() {
     log_info "$context" "Passwords will be saved to .env file during setup"
 }
 
+# Choose deployment mode
+choose_deployment_mode() {
+    local context="$MAIN_CONTEXT"
+    
+    log_section "Deployment Mode Selection"
+    
+    # Check for non-interactive mode via environment variables
+    if [ -n "$DEPLOYMENT_MODE" ]; then
+        log_info "$context" "Non-interactive mode: Using preset deployment mode"
+        
+        # Normalize deployment mode (support numeric and text values)
+        case "$DEPLOYMENT_MODE" in
+            1|"registry"|"github"|"REGISTRY"|"GITHUB")
+                export DEPLOYMENT_MODE="registry"
+                ;;
+            2|"local"|"build"|"LOCAL"|"BUILD")
+                export DEPLOYMENT_MODE="local"
+                ;;
+            *)
+                log_error "$context" "Invalid DEPLOYMENT_MODE environment variable: $DEPLOYMENT_MODE"
+                log_error "$context" "Valid values: 1, 2, registry, local, github, build"
+                return 1
+                ;;
+        esac
+        
+        log_info "$context" "Environment variable DEPLOYMENT_MODE=$DEPLOYMENT_MODE"
+        
+        # For registry mode, check if GITHUB_REPO is also set
+        if [ "$DEPLOYMENT_MODE" = "registry" ] && [ -z "$GITHUB_REPO" ]; then
+            log_error "$context" "Registry mode requires GITHUB_REPO environment variable"
+            log_error "$context" "Example: export GITHUB_REPO=username/ruuvi-home"
+            return 1
+        fi
+    else
+        echo -e "${COLOR_YELLOW}Choose deployment mode:${COLOR_NC}"
+        echo "1) GitHub Registry (Recommended) - Pull pre-built images from GitHub Actions"
+        echo "2) Local Build - Build all images locally from source"
+        echo ""
+        echo "For non-interactive setup, set environment variables:"
+        echo "  export DEPLOYMENT_MODE=1  # or 'registry'"
+        echo "  export GITHUB_REPO=username/ruuvi-home  # required for registry mode"
+        echo ""
+        
+        while true; do
+            read -p "Enter choice (1 or 2): " choice
+            case $choice in
+                1)
+                    export DEPLOYMENT_MODE="registry"
+                    break
+                    ;;
+                2)
+                    export DEPLOYMENT_MODE="local"
+                    break
+                    ;;
+                *)
+                    echo "Invalid choice. Please enter 1 or 2."
+                    ;;
+            esac
+        done
+    fi
+    
+    # Configure based on deployment mode
+    case "$DEPLOYMENT_MODE" in
+        "registry")
+            log_info "$context" "Selected: GitHub Registry mode"
+            export DOCKER_COMPOSE_FILE="docker-compose.registry.yaml"
+            
+            # Prompt for GitHub repository if not set
+            if [ -z "$GITHUB_REPO" ]; then
+                echo ""
+                read -p "Enter GitHub repository (e.g., username/ruuvi-home): " repo_input
+                export GITHUB_REPO="$repo_input"
+            fi
+            
+            log_info "$context" "Will pull images from: $GITHUB_REGISTRY/$GITHUB_REPO"
+            log_info "$context" "Using compose file: $DOCKER_COMPOSE_FILE"
+            ;;
+        "local")
+            log_info "$context" "Selected: Local build mode"
+            export DOCKER_COMPOSE_FILE="docker-compose.yaml"
+            log_info "$context" "Will build all images locally from source"
+            log_info "$context" "Using compose file: $DOCKER_COMPOSE_FILE"
+            ;;
+        *)
+            log_error "$context" "Invalid deployment mode: $DEPLOYMENT_MODE"
+            return 1
+            ;;
+    esac
+    
+    log_success "$context" "Deployment mode configured: $DEPLOYMENT_MODE"
+}
+
 # Load configuration variables
 load_config() {
     # Export key variables for modules (no YAML dependency for now)
@@ -71,6 +163,12 @@ load_config() {
     # Docker configuration
     export DOCKER_LOG_MAX_SIZE="${DOCKER_LOG_MAX_SIZE:-10m}"
     export DOCKER_LOG_MAX_FILE="${DOCKER_LOG_MAX_FILE:-3}"
+    
+    # Deployment mode (will be set by choose_deployment_mode)
+    export DEPLOYMENT_MODE="${DEPLOYMENT_MODE:-}"
+    export DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE_FILE:-}"
+    export GITHUB_REGISTRY="${GITHUB_REGISTRY:-ghcr.io}"
+    export GITHUB_REPO="${GITHUB_REPO:-}"
     
     # Colors for output
     export COLOR_GREEN='\033[0;32m'
@@ -188,6 +286,7 @@ execute_module() {
     export SCRIPT_DIR MODULE_DIR LIB_DIR TEMPLATE_DIR
     export RUUVI_USER PROJECT_DIR DATA_DIR LOG_DIR BACKUP_DIR
     export POSTGRES_PASSWORD MQTT_PASSWORD WEBHOOK_SECRET JWT_SECRET SESSION_SECRET
+    export DEPLOYMENT_MODE DOCKER_COMPOSE_FILE GITHUB_REGISTRY GITHUB_REPO
     
     # Execute module with error handling
     if bash "$module_path"; then
@@ -257,6 +356,8 @@ User: $RUUVI_USER
 Project Directory: $PROJECT_DIR
 
 Configuration:
+- Deployment Mode: $DEPLOYMENT_MODE
+- Docker Compose File: $DOCKER_COMPOSE_FILE
 - Webhook Port: $WEBHOOK_PORT
 - Frontend Port: $FRONTEND_PORT
 - API Port: $API_PORT
@@ -339,6 +440,12 @@ main() {
     
     # Print header
     print_header
+    
+    # Choose deployment mode
+    if ! choose_deployment_mode; then
+        log_error "$context" "Deployment mode selection failed"
+        exit 1
+    fi
     
     # Validate script environment
     if ! validate_script_environment; then

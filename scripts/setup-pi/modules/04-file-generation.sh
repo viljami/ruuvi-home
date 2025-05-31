@@ -181,19 +181,28 @@ JSONEOF
     log_deployment "Frontend files created"
 fi
 
-# Build and update Docker containers
-log_deployment "Building Docker images..."
-docker compose build --no-cache
+# Deploy based on deployment mode
+DEPLOYMENT_MODE=\${DEPLOYMENT_MODE:-local}
+COMPOSE_FILE=\${DOCKER_COMPOSE_FILE:-docker-compose.yaml}
 
-log_deployment "Starting services..."
-docker compose up -d --force-recreate
+if [ "\$DEPLOYMENT_MODE" = "registry" ]; then
+    log_deployment "Registry mode: Pulling pre-built images..."
+    docker compose -f "\$COMPOSE_FILE" pull
+    log_deployment "Starting services with registry images..."
+    docker compose -f "\$COMPOSE_FILE" up -d --force-recreate
+else
+    log_deployment "Local mode: Building Docker images..."
+    docker compose -f "\$COMPOSE_FILE" build --no-cache
+    log_deployment "Starting services with locally built images..."
+    docker compose -f "\$COMPOSE_FILE" up -d --force-recreate
+fi
 
 # Wait for services to be ready
 log_deployment "Waiting for services to be ready..."
 sleep 30
 
 # Verify services are running
-if docker compose ps | grep -q "Up"; then
+if docker compose -f "\$COMPOSE_FILE" ps | grep -q "Up"; then
     log_deployment "Services started successfully"
 else
     log_deployment "Warning: Some services may not have started properly"
@@ -301,6 +310,17 @@ LOG_FILEPATH=${LOG_DIR}/mqtt-reader.log
 
 # Docker Configuration
 TIMESCALEDB_TELEMETRY=off
+
+# Deployment Configuration
+DEPLOYMENT_MODE=${DEPLOYMENT_MODE:-local}
+DOCKER_COMPOSE_FILE=${DOCKER_COMPOSE_FILE:-docker-compose.yaml}
+GITHUB_REGISTRY=${GITHUB_REGISTRY:-ghcr.io}
+GITHUB_REPO=${GITHUB_REPO:-}
+IMAGE_TAG=${IMAGE_TAG:-latest}
+
+# Public URLs (for production deployments)
+PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:3000}
+CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
 EOF
     
     chmod 600 "$env_path"
@@ -314,23 +334,37 @@ generate_systemd_services() {
     
     log_info "$context" "Generating systemd service files"
     
+    # Determine which compose file to use
+    local compose_file="${DOCKER_COMPOSE_FILE:-docker-compose.yaml}"
+    log_info "$context" "Using compose file: $compose_file"
+    log_info "$context" "Deployment mode: ${DEPLOYMENT_MODE:-local}"
+    
     # Detect Docker Compose command and get full path
     local docker_compose_start_cmd
     local docker_compose_stop_cmd
+    local docker_compose_pull_cmd
     
     if command -v docker-compose &> /dev/null; then
         local compose_path=$(command -v docker-compose)
-        docker_compose_start_cmd="$compose_path up -d"
-        docker_compose_stop_cmd="$compose_path down"
+        docker_compose_start_cmd="$compose_path -f $compose_file up -d"
+        docker_compose_stop_cmd="$compose_path -f $compose_file down"
+        docker_compose_pull_cmd="$compose_path -f $compose_file pull"
         log_info "$context" "Using docker-compose at: $compose_path"
     elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
         local docker_path=$(command -v docker)
-        docker_compose_start_cmd="$docker_path compose up -d"
-        docker_compose_stop_cmd="$docker_path compose down"
+        docker_compose_start_cmd="$docker_path compose -f $compose_file up -d"
+        docker_compose_stop_cmd="$docker_path compose -f $compose_file down"
+        docker_compose_pull_cmd="$docker_path compose -f $compose_file pull"
         log_info "$context" "Using docker compose plugin at: $docker_path"
     else
         log_error "$context" "Neither docker-compose nor docker compose found"
         return 1
+    fi
+    
+    # For registry mode, add image pull step
+    if [ "$DEPLOYMENT_MODE" = "registry" ]; then
+        docker_compose_start_cmd="$docker_compose_pull_cmd && $docker_compose_start_cmd"
+        log_info "$context" "Registry mode: Will pull images before starting services"
     fi
     
     # Ruuvi Home main service
@@ -851,6 +885,173 @@ handle_mosquitto_migration() {
     return 0
 }
 
+# Setup docker-compose file based on deployment mode
+setup_docker_compose_file() {
+    local context="$MODULE_CONTEXT"
+    
+    log_info "$context" "Setting up docker-compose file for deployment mode: ${DEPLOYMENT_MODE:-local}"
+    
+    case "${DEPLOYMENT_MODE:-local}" in
+        "registry")
+            local compose_file="$PROJECT_DIR/docker-compose.registry.yaml"
+            
+            # Check if registry compose file exists in the repo
+            if [ ! -f "$compose_file" ]; then
+                log_info "$context" "Creating docker-compose.registry.yaml file"
+                
+                cat > "$compose_file" << 'EOF'
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: ruuvi-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./docker/mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    restart: unless-stopped
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto-simple.conf"]
+    environment:
+      - "ALLOW_ANONYMOUS=true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mosquitto_sub",
+          "-t",
+          "$$",
+          "-C",
+          "1",
+          "-i",
+          "healthcheck",
+          "-W",
+          "3",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Time-series Database with TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ruuvi-timescaledb
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+      - ./docker/timescaledb/init-timescaledb.sql:/docker-entrypoint-initdb.d/init-timescaledb.sql
+    environment:
+      - POSTGRES_DB=ruuvi_home
+      - POSTGRES_USER=ruuvi
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ruuvi -d ruuvi_home"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+
+  # MQTT Reader (Rust backend service)
+  mqtt-reader:
+    image: ${GITHUB_REGISTRY:-ghcr.io}/${GITHUB_REPO}/mqtt-reader:${IMAGE_TAG:-latest}
+    container_name: ruuvi-mqtt-reader
+    depends_on:
+      - mosquitto
+      - timescaledb
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=ruuvi/gateway/data
+      - DATABASE_URL=${DATABASE_URL}
+      - RUST_LOG=${RUST_LOG:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f mqtt-reader"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # API Server (Rust backend service)
+  api-server:
+    image: ${GITHUB_REGISTRY:-ghcr.io}/${GITHUB_REPO}/api-server:${IMAGE_TAG:-latest}
+    container_name: ruuvi-api-server
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - API_PORT=8080
+      - RUST_LOG=${RUST_LOG:-info}
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Web UI
+  frontend:
+    image: ${GITHUB_REGISTRY:-ghcr.io}/${GITHUB_REPO}/frontend:${IMAGE_TAG:-latest}
+    container_name: ruuvi-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api-server:
+        condition: service_healthy
+    environment:
+      - REACT_APP_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  default:
+    name: ruuvi-network
+
+volumes:
+  timescaledb-data:
+  mosquitto-config:
+  mosquitto-data:
+  mosquitto-log:
+EOF
+                
+                chown "$RUUVI_USER:$RUUVI_USER" "$compose_file"
+                log_success "$context" "Created docker-compose.registry.yaml"
+            else
+                log_info "$context" "Registry compose file already exists"
+            fi
+            ;;
+        "local")
+            log_info "$context" "Using existing docker-compose.yaml for local build mode"
+            
+            # Verify the local compose file exists
+            if [ ! -f "$PROJECT_DIR/docker-compose.yaml" ]; then
+                log_error "$context" "docker-compose.yaml not found for local build mode"
+                return 1
+            fi
+            ;;
+        *)
+            log_error "$context" "Unknown deployment mode: ${DEPLOYMENT_MODE}"
+            return 1
+            ;;
+    esac
+    
+    log_success "$context" "Docker compose file setup completed"
+    return 0
+}
+
 # Generate all required files
 generate_all_required_files() {
     local context="$MODULE_CONTEXT"
@@ -972,6 +1173,7 @@ setup_file_generation() {
     local context="$MODULE_CONTEXT"
     local setup_steps=(
         "handle_mosquitto_migration:Handle Mosquitto migration"
+        "setup_docker_compose_file:Setup docker-compose file"
         "generate_all_required_files:Generate all required files"
         "set_file_permissions:Set file permissions"
         "validate_generated_files:Validate generated files"

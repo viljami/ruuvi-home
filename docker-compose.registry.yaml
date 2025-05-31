@@ -1,0 +1,125 @@
+services:
+  # MQTT Broker
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: ruuvi-mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./docker/mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+    restart: unless-stopped
+    command: ["mosquitto", "-c", "/mosquitto/config/mosquitto-simple.conf"]
+    environment:
+      - "ALLOW_ANONYMOUS=true"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mosquitto_sub",
+          "-t",
+          "$$",
+          "-C",
+          "1",
+          "-i",
+          "healthcheck",
+          "-W",
+          "3",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Time-series Database with TimescaleDB
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: ruuvi-timescaledb
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+      - ./docker/timescaledb/init-timescaledb.sql:/docker-entrypoint-initdb.d/init-timescaledb.sql
+    environment:
+      - POSTGRES_DB=ruuvi_home
+      - POSTGRES_USER=ruuvi
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ruuvi -d ruuvi_home"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
+
+  # MQTT Reader (Rust backend service)
+  mqtt-reader:
+    image: ${GITHUB_REGISTRY:-ghcr.io}/${GITHUB_REPO}/mqtt-reader:${IMAGE_TAG:-latest}
+    container_name: ruuvi-mqtt-reader
+    depends_on:
+      - mosquitto
+      - timescaledb
+    environment:
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+      - MQTT_TOPIC=ruuvi/gateway/data
+      - DATABASE_URL=${DATABASE_URL}
+      - RUST_LOG=${RUST_LOG:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f mqtt-reader"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+
+  # API Server (Rust backend service)
+  api-server:
+    image: ${GITHUB_REGISTRY:-ghcr.io}/${GITHUB_REPO}/api-server:${IMAGE_TAG:-latest}
+    container_name: ruuvi-api-server
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - API_PORT=8080
+      - RUST_LOG=${RUST_LOG:-info}
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Web UI
+  frontend:
+    image: ${GITHUB_REGISTRY:-ghcr.io}/${GITHUB_REPO}/frontend:${IMAGE_TAG:-latest}
+    container_name: ruuvi-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api-server:
+        condition: service_healthy
+    environment:
+      - REACT_APP_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  default:
+    name: ruuvi-network
+
+volumes:
+  timescaledb-data:
+  mosquitto-config:
+  mosquitto-data:
+  mosquitto-log:

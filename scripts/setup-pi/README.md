@@ -4,13 +4,60 @@ This directory contains the modular, first-class setup system for Ruuvi Home on 
 
 ## Quick Start
 
+### Interactive Setup
 ```bash
 # Clone repository
 git clone https://github.com/viljami/ruuvi-home.git
 cd ruuvi-home
 
-# Run setup (will auto-detect user from sudo)
-sudo ./scripts/setup-pi.sh
+# Run setup (will prompt for deployment mode choice)
+sudo ./scripts/setup-pi/setup-pi.sh
+```
+
+### Non-Interactive Setup
+```bash
+# GitHub Registry mode (recommended for production)
+export DEPLOYMENT_MODE=registry
+export GITHUB_REPO=username/ruuvi-home
+sudo ./scripts/setup-pi/setup-pi.sh
+
+# Local build mode (for development)
+export DEPLOYMENT_MODE=local
+sudo ./scripts/setup-pi/setup-pi.sh
+```
+
+## Deployment Modes
+
+The setup system supports two deployment modes to accommodate different use cases:
+
+### 1. GitHub Registry Mode (Recommended)
+- **Purpose**: Production deployments using pre-built images
+- **How it works**: Pulls Docker images from GitHub Container Registry (ghcr.io)
+- **Benefits**: 
+  - Faster deployment (no local building)
+  - Consistent images across environments
+  - Reduced Pi resource usage
+  - CI/CD pipeline integration
+- **Requirements**: Network access to ghcr.io and valid GitHub repository
+
+### 2. Local Build Mode
+- **Purpose**: Development and standalone deployments
+- **How it works**: Builds all Docker images locally from source code
+- **Benefits**:
+  - Full control over build process
+  - No external dependencies
+  - Ability to modify source before building
+- **Requirements**: Sufficient Pi resources for building (4GB+ RAM recommended)
+
+### Mode Selection
+```bash
+# Interactive mode - will prompt for choice
+sudo ./scripts/setup-pi/setup-pi.sh
+
+# Non-interactive via environment variables
+export DEPLOYMENT_MODE=registry  # or 'local', '1', '2'
+export GITHUB_REPO=username/ruuvi-home  # required for registry mode
+sudo ./scripts/setup-pi/setup-pi.sh
 ```
 
 ## Architecture
@@ -21,6 +68,13 @@ The setup system follows clean separation of concerns:
 - **Python**: File generation and templating (Jinja2)
 - **YAML**: Configuration (replacing bash env files)
 - **Templates**: Clean, reusable file templates
+</text>
+
+<old_text>
+### Complete Setup
+```bash
+sudo ./scripts/setup-pi.sh
+```
 
 ### Directory Structure
 
@@ -137,6 +191,17 @@ scripts/
 
 ## Configuration
 
+### Environment Variables
+
+The setup script supports these environment variables for non-interactive deployment:
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `DEPLOYMENT_MODE` | Deployment mode selection | Yes | `registry`, `local`, `1`, `2` |
+| `GITHUB_REPO` | GitHub repository for registry mode | Registry mode only | `username/ruuvi-home` |
+| `GITHUB_REGISTRY` | Container registry URL | No | `ghcr.io` (default) |
+| `IMAGE_TAG` | Docker image tag to use | No | `latest` (default) |
+
 ### YAML Configuration (config.yaml)
 
 Replace bash environment variables with structured YAML:
@@ -150,10 +215,16 @@ project:
   directory: "{{ user.home }}/ruuvi-home"
   repository: "https://github.com/viljami/ruuvi-home.git"
 
+deployment:
+  mode: "{{ DEPLOYMENT_MODE | default('local') }}"
+  github_repo: "{{ GITHUB_REPO | default('') }}"
+  registry: "{{ GITHUB_REGISTRY | default('ghcr.io') }}"
+  image_tag: "{{ IMAGE_TAG | default('latest') }}"
+
 ports:
   webhook: 9000
   frontend: 80
-  api: 3000
+  api: 8080
 
 features:
   fish_shell: true
@@ -314,8 +385,14 @@ python3 generator.py config.yaml --type python --verbose
 
 ### Integration Testing
 ```bash
-# Full setup test
-sudo ./setup-pi.sh
+# Full setup test - registry mode
+export DEPLOYMENT_MODE=registry
+export GITHUB_REPO=username/ruuvi-home
+sudo ./scripts/setup-pi/setup-pi.sh
+
+# Full setup test - local build mode
+export DEPLOYMENT_MODE=local
+sudo ./scripts/setup-pi/setup-pi.sh
 ```
 
 ## Troubleshooting
@@ -327,6 +404,31 @@ sudo ./setup-pi.sh
 # Check permissions
 chmod +x scripts/setup-pi/modules/*.sh
 chmod +x scripts/setup-pi/lib/*.sh
+```
+
+**Registry mode image pull fails**
+```bash
+# Check network connectivity
+ping ghcr.io
+
+# Verify repository exists
+export GITHUB_REPO=username/ruuvi-home
+docker pull ghcr.io/${GITHUB_REPO}/frontend:latest
+
+# Check repository permissions (if private)
+docker login ghcr.io
+```
+
+**Local build mode fails**
+```bash
+# Check available disk space (need 2GB+)
+df -h
+
+# Check available memory (need 2GB+ free)
+free -h
+
+# Monitor build process
+docker system df
 ```
 
 **Template generation fails**
@@ -342,6 +444,10 @@ python3 -c "from jinja2 import Template; Template(open('template.j2').read())"
 ```bash
 # Validate YAML
 python3 -c "import yaml; yaml.safe_load(open('config.yaml'))"
+
+# Check deployment mode settings
+echo "DEPLOYMENT_MODE=$DEPLOYMENT_MODE"
+echo "GITHUB_REPO=$GITHUB_REPO"
 ```
 
 ### Log Locations
