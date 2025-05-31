@@ -220,11 +220,11 @@ run_setup_modules() {
             failed_modules+=("$module_file")
             
             # Check if we should continue or stop
-            if [[ "$module_file" == "00-validation.sh" ]]; then
-                log_error "$context" "Validation failed, cannot continue"
+            if [[ "$module_file" == "00-validation.sh" || "$module_file" == "01-system-setup.sh" || "$module_file" == "02-docker-setup.sh" || "$module_file" == "03-directories.sh" || "$module_file" == "04-file-generation.sh" ]]; then
+                log_error "$context" "Critical module failed, cannot continue: $module_file"
                 return 1
             else
-                log_warn "$context" "Module failed but continuing: $module_file"
+                log_warn "$context" "Non-critical module failed but continuing: $module_file"
             fi
         fi
         
@@ -232,9 +232,9 @@ run_setup_modules() {
     done
     
     if [ ${#failed_modules[@]} -gt 0 ]; then
-        log_warn "$context" "Some modules failed: ${failed_modules[*]}"
-        log_warn "$context" "Manual intervention may be required"
-        return 2
+        log_error "$context" "Setup failed due to module failures: ${failed_modules[*]}"
+        log_error "$context" "Manual intervention required before system is functional"
+        return 1
     fi
     
     log_success "$context" "All setup modules completed successfully"
@@ -288,8 +288,7 @@ print_completion() {
     log_section "Setup Complete"
     log_success "$context" "Ruuvi Home setup completed successfully"
     log_info "$context" "Project installed in: $PROJECT_DIR"
-    log_success "$context" "All setup modules completed successfully"
-    log_info "$context" "Services available: ruuvi-home, ruuvi-webhook"
+    log_info "$context" "Services configured: ruuvi-home, ruuvi-webhook"
     log_info "$context" "Setup summary: $PROJECT_DIR/setup-summary.log"
     
     echo -e "\n${COLOR_GREEN}Security Information:${COLOR_NC}"
@@ -354,17 +353,10 @@ main() {
     fi
     
     # Run setup modules
-    local setup_result
-    if ! setup_result=$(run_setup_modules); then
-        case $? in
-            1)
-                log_error "$context" "Critical setup failure"
-                exit 1
-                ;;
-            2)
-                log_warn "$context" "Setup completed with warnings"
-                ;;
-        esac
+    if ! run_setup_modules; then
+        log_error "$context" "Setup failed - system is not functional"
+        log_error "$context" "Please fix the issues above and re-run the setup"
+        exit 1
     fi
     
     # Create setup summary

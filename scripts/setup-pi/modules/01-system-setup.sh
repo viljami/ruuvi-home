@@ -11,12 +11,10 @@ readonly MODULE_CONTEXT="SYSTEM"
 # Get script directory for relative imports
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
-CONFIG_DIR="$(dirname "$SCRIPT_DIR")/config"
 
 # Source dependencies
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
-source "$CONFIG_DIR/setup.env"
 
 # Required packages for Ruuvi Home
 readonly REQUIRED_PACKAGES=(

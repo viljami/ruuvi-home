@@ -29,6 +29,16 @@ install_generator_dependencies() {
     
     log_info "$context" "Installing Python dependencies for file generator"
     
+    # Ensure pip3 is installed first
+    if ! command -v pip3 &> /dev/null; then
+        log_info "$context" "Installing pip3"
+        export DEBIAN_FRONTEND=noninteractive
+        if ! apt-get update -qq && apt-get install -y -qq python3-pip; then
+            log_error "$context" "Failed to install pip3"
+            return 1
+        fi
+    fi
+    
     # Install required packages
     for package in "${REQUIREMENTS[@]}"; do
         log_debug "$context" "Installing: $package"
