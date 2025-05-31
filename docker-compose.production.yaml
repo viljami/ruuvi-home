@@ -32,48 +32,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # ⚠️  DEVELOPMENT ONLY - DO NOT DEPLOY TO PRODUCTION ⚠️
-  # This MQTT simulator is for development and testing purposes only.
-  # For production deployments on Raspberry Pi, use docker-compose.production.yaml
-  # which excludes this service and expects real Ruuvi sensors via Gateway.
-  mqtt-simulator:
-    build:
-      context: ./docker/mqtt-simulator
-      dockerfile: Dockerfile
-    container_name: ruuvi-mqtt-simulator
-    depends_on:
-      - mosquitto
-      - timescaledb
-    environment:
-      - MQTT_BROKER=mosquitto
-      - MQTT_PORT=1883
-      - MQTT_TOPIC=ruuvi/gateway/data
-      - PUBLISH_INTERVAL=5.0
-      - NUM_SENSORS=3
-      - GATEWAY_MAC=AA:BB:CC:DD:EE:FF
-    restart: unless-stopped
-    volumes:
-      - ./docker/mqtt-simulator:/app
-
-  # MQTT Simulator Tests
-  # mqtt-simulator-tests:
-  #   build:
-  #     context: ./docker/mqtt-simulator
-  #     dockerfile: Dockerfile
-  #   container_name: ruuvi-mqtt-simulator-tests
-  #   depends_on:
-  #     - mosquitto
-  #   environment:
-  #     - MQTT_BROKER=mosquitto
-  #     - MQTT_PORT=1883
-  #     - MQTT_TOPIC=ruuvi/gateway/data
-  #     - PUBLISH_INTERVAL=0.1
-  #     - NUM_SENSORS=2
-  #     - GATEWAY_MAC=AA:BB:CC:DD:EE:FF
-  #   volumes:
-  #     - ./docker/mqtt-simulator:/app
-  #   command: python -m pytest tests/ -v --cov=simulator --cov-report=term
-
   # Time-series Database with TimescaleDB
   timescaledb:
     image: timescale/timescaledb:latest-pg15
@@ -86,7 +44,7 @@ services:
     environment:
       - POSTGRES_DB=ruuvi_home
       - POSTGRES_USER=ruuvi
-      - POSTGRES_PASSWORD=ruuvi_secret
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
     restart: unless-stopped
     healthcheck:
@@ -109,11 +67,14 @@ services:
       - MQTT_HOST=mosquitto
       - MQTT_PORT=1883
       - MQTT_TOPIC=ruuvi/gateway/data
-      - DATABASE_URL=postgresql://ruuvi:ruuvi_secret@timescaledb:5432/ruuvi_home
-      - RUST_LOG=info
+      - DATABASE_URL=${DATABASE_URL}
+      - RUST_LOG=${RUST_LOG:-info}
     restart: unless-stopped
-    # volumes:
-    #   - ./backend:/app
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f mqtt-reader"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
 
   # API Server (Rust backend service)
   api-server:
@@ -122,17 +83,21 @@ services:
       dockerfile: ./docker/api-server.Dockerfile
     container_name: ruuvi-api-server
     ports:
-      - "8080:8080"
+      - "${API_PORT:-8080}:8080"
     depends_on:
       timescaledb:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgresql://ruuvi:ruuvi_secret@timescaledb:5432/ruuvi_home
+      - DATABASE_URL=${DATABASE_URL}
       - API_PORT=8080
-      - RUST_LOG=info
+      - RUST_LOG=${RUST_LOG:-info}
+      - CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
     restart: unless-stopped
-    # volumes:
-    #   - ./backend:/app
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Frontend Web UI
   frontend:
@@ -141,17 +106,19 @@ services:
       dockerfile: ./docker/frontend.Dockerfile
     container_name: ruuvi-frontend
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      - api-server
+      api-server:
+        condition: service_healthy
     environment:
-      - REACT_APP_API_URL=http://localhost:8080
-      - NODE_ENV=development
-    # volumes:
-    #   - ./frontend:/app
-    #   - /app/node_modules
+      - REACT_APP_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - NODE_ENV=production
     restart: unless-stopped
-    # command: npm start
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   default:

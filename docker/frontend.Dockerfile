@@ -17,8 +17,18 @@ RUN npm ci --production=false --silent && \
 
 COPY frontend/ .
 
-# Build with memory constraints
+# Run smoke tests to verify app builds correctly
+RUN npm test -- --testNamePattern="App Smoke Tests" --watchAll=false --verbose=false
+
+# Build with memory constraints and verify output
 RUN npm run build && \
+    # Verify critical build files exist \
+    test -f build/index.html && \
+    test -f build/manifest.json && \
+    test -d build/static && \
+    # Check build size is reasonable (< 50MB) \
+    [ $(du -sm build | cut -f1) -lt 50 ] && \
+    echo "Build verification passed" && \
     rm -rf node_modules && \
     npm cache clean --force
 

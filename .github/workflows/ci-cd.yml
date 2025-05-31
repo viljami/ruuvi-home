@@ -32,20 +32,34 @@ jobs:
         with:
           workspaces: backend
 
-      - name: Check formatting
+      - name: Run enhanced lint checks
         run: |
-          cd backend
-          cargo fmt --all -- --check
-
-      - name: Run Clippy
-        run: |
-          cd backend
-          cargo clippy --all-targets --all-features -- -D warnings
+          ./scripts/check-lints.sh
 
       - name: Run tests
         run: |
           cd backend
           cargo test --all-features --workspace
+
+  # Test job for frontend React code
+  test-frontend:
+    runs-on: ubuntu-latest
+    name: Test Frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Run frontend build verification
+        run: |
+          ./scripts/verify-frontend-build.sh
 
   # Test job for MQTT simulator
   test-simulator:
@@ -83,7 +97,7 @@ jobs:
   integration-test:
     runs-on: ubuntu-latest
     name: Integration Tests
-    needs: [test-backend, test-simulator]
+    needs: [test-backend, test-frontend, test-simulator]
 
     steps:
       - name: Checkout code
@@ -115,7 +129,7 @@ jobs:
   build-images:
     runs-on: ubuntu-latest
     name: Build Docker Images
-    needs: [test-backend, test-simulator]
+    needs: [test-backend, test-frontend, test-simulator]
     if: github.event_name != 'pull_request'
 
     strategy:
