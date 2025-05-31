@@ -12,7 +12,6 @@ readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Directory structure
 readonly LIB_DIR="$SCRIPT_DIR/lib"
-readonly CONFIG_DIR="$SCRIPT_DIR/config"
 readonly MODULE_DIR="$SCRIPT_DIR/modules"
 readonly TEMPLATE_DIR="$SCRIPT_DIR/templates"
 
@@ -191,7 +190,7 @@ execute_module() {
     log_info "$context" "Executing module: $module_file"
     
     # Set up module environment
-    export SCRIPT_DIR MODULE_DIR LIB_DIR CONFIG_DIR TEMPLATE_DIR
+    export SCRIPT_DIR MODULE_DIR LIB_DIR TEMPLATE_DIR
     export RUUVI_USER PROJECT_DIR DATA_DIR LOG_DIR BACKUP_DIR
     export POSTGRES_PASSWORD MQTT_PASSWORD WEBHOOK_SECRET JWT_SECRET SESSION_SECRET
     

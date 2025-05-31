@@ -2,6 +2,11 @@
 
 ## 🧱 Project Structure & Rules
 
+### 0. Git practices
+
+- Do not push code wihtout prompting
+- Align git commits to the format: start with a verb in present to describe what happened and why, it's ok to use fix/feat keywords in the beginning if there is no ticket code or milestone clearly related - otherwise use ticket(T12345) or milestone (M1.2)
+
 ### 1. Modular Code
 
 - All code must be testable:
