@@ -2,11 +2,11 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   release:
-    types: [ published ]
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -17,99 +17,99 @@ jobs:
   test-backend:
     runs-on: ubuntu-latest
     name: Test Backend
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt, clippy
-        
-    - name: Cache Rust dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        workspaces: backend
-        
-    - name: Check formatting
-      run: |
-        cd backend
-        cargo fmt --all -- --check
-        
-    - name: Run Clippy
-      run: |
-        cd backend
-        cargo clippy --all-targets --all-features -- -D warnings
-        
-    - name: Run tests
-      run: |
-        cd backend
-        cargo test --all-features --workspace
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: Check formatting
+        run: |
+          cd backend
+          cargo fmt --all -- --check
+
+      - name: Run Clippy
+        run: |
+          cd backend
+          cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run tests
+        run: |
+          cd backend
+          cargo test --all-features --workspace
 
   # Test job for MQTT simulator
   test-simulator:
     runs-on: ubuntu-latest
     name: Test MQTT Simulator
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Install dependencies
-      run: |
-        cd docker/mqtt-simulator
-        pip install -r requirements.txt
-        pip install pytest pytest-cov
-        
-    - name: Run tests
-      run: |
-        cd docker/mqtt-simulator
-        python -m pytest tests/ -v --cov=simulator --cov-report=xml
-        
-    - name: Upload coverage to Codecov
-      if: github.event_name != 'pull_request'
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./docker/mqtt-simulator/coverage.xml
-        flags: simulator
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          cd docker/mqtt-simulator
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        run: |
+          cd docker/mqtt-simulator
+          python -m pytest tests/ -v --cov=simulator --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request'
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./docker/mqtt-simulator/coverage.xml
+          flags: simulator
 
   # Integration test with full stack
   integration-test:
     runs-on: ubuntu-latest
     name: Integration Tests
     needs: [test-backend, test-simulator]
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Start test environment
-      run: |
-        docker-compose -f docker-compose-test.yaml up -d
-        
-    - name: Wait for services to be ready
-      run: |
-        timeout 120 bash -c 'until curl -f http://localhost:8086/health; do sleep 2; done'
-        timeout 60 bash -c 'until curl -f http://localhost:8080/health; do sleep 2; done'
-        
-    - name: Run integration tests
-      run: |
-        # Test MQTT simulator is producing data
-        docker-compose -f docker-compose-test.yaml logs mqtt-simulator-tests
-        
-        # Test API endpoints
-        curl -f http://localhost:8080/api/sensors || exit 1
-        
-    - name: Cleanup
-      if: always()
-      run: |
-        docker-compose -f docker-compose-test.yaml down -v
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start test environment
+        run: |
+          docker-compose -f docker-compose-test.yaml up -d
+
+      - name: Wait for services to be ready
+        run: |
+          timeout 120 bash -c 'until curl -f http://localhost:8086/health; do sleep 2; done'
+          timeout 60 bash -c 'until curl -f http://localhost:8080/health; do sleep 2; done'
+
+      - name: Run integration tests
+        run: |
+          # Test MQTT simulator is producing data
+          docker-compose -f docker-compose-test.yaml logs mqtt-simulator-tests
+
+          # Test API endpoints
+          curl -f http://localhost:8080/api/sensors || exit 1
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker-compose -f docker-compose-test.yaml down -v
 
   # Build multi-architecture Docker images
   build-images:
@@ -117,49 +117,49 @@ jobs:
     name: Build Docker Images
     needs: [test-backend, test-simulator]
     if: github.event_name != 'pull_request'
-    
+
     strategy:
       matrix:
         service: [mqtt-reader, api-server, mqtt-simulator]
-        
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-      
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-        
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=sha,prefix={{branch}}-
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
-        dockerfile: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('./docker/{0}.Dockerfile', matrix.service) }}
-        platforms: linux/amd64,linux/arm64,linux/arm/v7
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
+          dockerfile: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('./docker/{0}.Dockerfile', matrix.service) }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # Deploy to Raspberry Pi (only on main branch)
   deploy-pi:
@@ -167,81 +167,81 @@ jobs:
     name: Deploy to Raspberry Pi
     needs: [integration-test, build-images]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup SSH
-      uses: webfactory/ssh-agent@v0.8.0
-      with:
-        ssh-private-key: ${{ secrets.PI_SSH_KEY }}
-        
-    - name: Add Pi to known hosts
-      run: |
-        ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts
-        
-    - name: Deploy to Raspberry Pi
-      env:
-        PI_HOST: ${{ secrets.PI_HOST }}
-        PI_USER: ${{ secrets.PI_USER }}
-        INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
-        GATEWAY_MAC: ${{ secrets.GATEWAY_MAC }}
-      run: |
-        # Create deployment script
-        cat > deploy.sh << 'EOF'
-        #!/bin/bash
-        set -e
-        
-        cd /home/pi/ruuvi-home
-        
-        # Pull latest code
-        git pull origin main
-        
-        # Update environment variables
-        if [ ! -f .env ]; then
-          cp .env.example .env
-        fi
-        
-        # Update sensitive environment variables from GitHub secrets
-        sed -i "s/INFLUXDB_TOKEN=.*/INFLUXDB_TOKEN=${INFLUXDB_TOKEN}/" .env
-        sed -i "s/GATEWAY_MAC=.*/GATEWAY_MAC=${GATEWAY_MAC}/" .env
-        
-        # Pull latest images and restart services
-        docker-compose pull
-        docker-compose up -d
-        
-        # Verify deployment
-        sleep 30
-        curl -f http://localhost:8080/health || exit 1
-        
-        echo "Deployment successful!"
-        EOF
-        
-        # Copy and execute deployment script
-        scp deploy.sh ${PI_USER}@${PI_HOST}:/tmp/
-        ssh ${PI_USER}@${PI_HOST} "chmod +x /tmp/deploy.sh && /tmp/deploy.sh"
-        
-    - name: Verify deployment
-      env:
-        PI_HOST: ${{ secrets.PI_HOST }}
-        PI_USER: ${{ secrets.PI_USER }}
-      run: |
-        # Wait a bit for services to fully start
-        sleep 60
-        
-        # Check service health
-        ssh ${PI_USER}@${PI_HOST} "curl -f http://localhost:8080/health"
-        ssh ${PI_USER}@${PI_HOST} "docker-compose ps"
-        
-    - name: Rollback on failure
-      if: failure()
-      env:
-        PI_HOST: ${{ secrets.PI_HOST }}
-        PI_USER: ${{ secrets.PI_USER }}
-      run: |
-        echo "Deployment failed, attempting rollback..."
-        ssh ${PI_USER}@${PI_HOST} "cd /home/pi/ruuvi-home && git reset --hard HEAD~1 && docker-compose up -d"
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.PI_SSH_KEY }}
+
+      - name: Add Pi to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Raspberry Pi
+        env:
+          PI_HOST: ${{ secrets.PI_HOST }}
+          PI_USER: ${{ secrets.PI_USER }}
+          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
+          GATEWAY_MAC: ${{ secrets.GATEWAY_MAC }}
+        run: |
+          # Create deployment script
+          cat > deploy.sh << 'EOF'
+          #!/bin/bash
+          set -e
+
+          cd /home/pi/ruuvi-home
+
+          # Pull latest code
+          git pull origin main
+
+          # Update environment variables
+          if [ ! -f .env ]; then
+            cp .env.example .env
+          fi
+
+          # Update sensitive environment variables from GitHub secrets
+          sed -i "s/INFLUXDB_TOKEN=.*/INFLUXDB_TOKEN=${INFLUXDB_TOKEN}/" .env
+          sed -i "s/GATEWAY_MAC=.*/GATEWAY_MAC=${GATEWAY_MAC}/" .env
+
+          # Pull latest images and restart services
+          docker-compose pull
+          docker-compose up -d
+
+          # Verify deployment
+          sleep 30
+          curl -f http://localhost:8080/health || exit 1
+
+          echo "Deployment successful!"
+          EOF
+
+          # Copy and execute deployment script
+          scp deploy.sh ${PI_USER}@${PI_HOST}:/tmp/
+          ssh ${PI_USER}@${PI_HOST} "chmod +x /tmp/deploy.sh && /tmp/deploy.sh"
+
+      - name: Verify deployment
+        env:
+          PI_HOST: ${{ secrets.PI_HOST }}
+          PI_USER: ${{ secrets.PI_USER }}
+        run: |
+          # Wait a bit for services to fully start
+          sleep 60
+
+          # Check service health
+          ssh ${PI_USER}@${PI_HOST} "curl -f http://localhost:8080/health"
+          ssh ${PI_USER}@${PI_HOST} "docker-compose ps"
+
+      - name: Rollback on failure
+        if: failure()
+        env:
+          PI_HOST: ${{ secrets.PI_HOST }}
+          PI_USER: ${{ secrets.PI_USER }}
+        run: |
+          echo "Deployment failed, attempting rollback..."
+          ssh ${PI_USER}@${PI_HOST} "cd /home/pi/ruuvi-home && git reset --hard HEAD~1 && docker-compose up -d"
 
   # Security scan
   security-scan:
@@ -249,24 +249,24 @@ jobs:
     name: Security Scan
     needs: build-images
     if: github.event_name != 'pull_request'
-    
+
     strategy:
       matrix:
         service: [mqtt-reader, api-server, mqtt-simulator]
-        
+
     steps:
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
-        format: 'sarif'
-        output: 'trivy-results-${{ matrix.service }}.sarif'
-        
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: 'trivy-results-${{ matrix.service }}.sarif'
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-results-${{ matrix.service }}.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results-${{ matrix.service }}.sarif"
 
   # Notify on deployment
   notify:
@@ -274,22 +274,22 @@ jobs:
     name: Notify Deployment
     needs: [deploy-pi]
     if: always() && github.ref == 'refs/heads/main'
-    
+
     steps:
-    - name: Notify deployment status
-      env:
-        WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-      run: |
-        if [ "${{ needs.deploy-pi.result }}" == "success" ]; then
-          STATUS="✅ SUCCESS"
-          COLOR="good"
-        else
-          STATUS="❌ FAILED"
-          COLOR="danger"
-        fi
-        
-        if [ -n "$WEBHOOK_URL" ]; then
-          curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"Ruuvi Home Deployment $STATUS\", \"color\":\"$COLOR\"}" \
-            $WEBHOOK_URL
-        fi
+      - name: Notify deployment status
+        env:
+          WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          if [ "${{ needs.deploy-pi.result }}" == "success" ]; then
+            STATUS="✅ SUCCESS"
+            COLOR="good"
+          else
+            STATUS="❌ FAILED"
+            COLOR="danger"
+          fi
+
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"Ruuvi Home Deployment $STATUS\", \"color\":\"$COLOR\"}" \
+              $WEBHOOK_URL
+          fi

@@ -1,0 +1,39 @@
+services:
+  # TimescaleDB - expose port for development
+  timescaledb:
+    ports:
+      - "5432:5432" # Expose for development tools
+
+  # Mosquitto - expose port for development
+  mosquitto:
+    ports:
+      - "1883:1883" # Expose for development
+
+  # MQTT Reader - build locally for development
+  mqtt-reader:
+    build:
+      context: .
+      dockerfile: docker/mqtt-reader.Dockerfile
+    image: ruuvi-home/mqtt-reader:dev
+    environment:
+      RUST_LOG: debug
+
+  # API - build locally for development
+  api-server:
+    build:
+      context: .
+      dockerfile: docker/api-server.Dockerfile
+    image: ruuvi-home/api:dev
+    environment:
+      RUST_LOG: debug
+      CORS_ALLOW_ORIGIN: "http://localhost:3000"
+
+  # Frontend - build locally for development
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    image: ruuvi-home/frontend:dev
+    environment:
+      NODE_ENV: development
+      REACT_APP_API_URL: http://localhost:8080

@@ -9,13 +9,13 @@ ENV INLINE_RUNTIME_CHUNK=false
 ENV IMAGE_INLINE_SIZE_LIMIT=0
 ENV NODE_OPTIONS="--max-old-space-size=1024"
 
-COPY package.json package-lock.json ./
+COPY frontend/package.json frontend/package-lock.json ./
 
 # Install dependencies with memory optimizations
 RUN npm ci --production=false --silent && \
     npm cache clean --force
 
-COPY . .
+COPY frontend/ .
 
 # Build with memory constraints
 RUN npm run build && \

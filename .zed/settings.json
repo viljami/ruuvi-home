@@ -1,0 +1,60 @@
+{
+  "assistant": {
+    "default_model": {
+      "provider": "zed.dev",
+      "model": "claude-3-5-sonnet-20241022"
+    },
+    "version": "2"
+  },
+  "project_panel": {
+    "dock": "left"
+  },
+  "outline_panel": {
+    "dock": "right"
+  },
+  "collaboration_panel": {
+    "dock": "left"
+  },
+  "notification_panel": {
+    "dock": "right"
+  },
+  "chat_panel": {
+    "dock": "right"
+  },
+  "vim_mode": false,
+  "ui_font_size": 16,
+  "buffer_font_size": 14,
+  "theme": {
+    "mode": "system",
+    "light": "One Light",
+    "dark": "One Dark"
+  },
+  "file_scan_exclusions": [
+    "**/.git",
+    "**/node_modules",
+    "**/target",
+    "**/.next",
+    "**/dist",
+    "**/build",
+    "**/venv",
+    "**/__pycache__"
+  ],
+  "quick_action_order": [
+    "AI_CODING_GUIDELINES.md",
+    "MILESTONES.md",
+    "README.md"
+  ],
+  "project_search": {
+    "include_ignored": false
+  },
+  "format_on_save": "on",
+  "code_actions_on_format": {
+    "source.organizeImports": true,
+    "source.fixAll": true
+  },
+  "auto_update": true,
+  "telemetry": {
+    "diagnostics": true,
+    "metrics": false
+  }
+}
