@@ -3,6 +3,10 @@
 //! This library provides the REST API for the Ruuvi Home monitoring system.
 //! It includes modular handlers, configuration, and utilities for testing.
 
+// Enforce strict error handling in application code, but allow expect/unwrap in tests
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+#![cfg_attr(not(test), deny(clippy::panic))]
+
 pub mod config;
 pub mod handlers;
 pub mod queries;

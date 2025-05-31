@@ -20,8 +20,10 @@ repository = "https://github.com/viljami/ruuvi-home"
 # Basic strict lints for all workspace members
 [workspace.lints.clippy]
 # Essential strict lints - no unwrap/expect/panic in production code
-unwrap_used = "deny"
-expect_used = "deny"
+# Note: expect_used and unwrap_used are "warn" at workspace level to allow in tests
+# Individual packages should deny these in non-test code using #![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+unwrap_used = "warn"
+expect_used = "warn"
 panic = "deny"
 unimplemented = "deny"
 todo = "deny"

@@ -84,7 +84,7 @@ mod tests {
     #[test]
     fn test_config_edge_cases() {
         // Test empty string
-        let config = Config::new("".to_string());
+        let config = Config::new(String::new());
         assert_eq!(config.database_url, "");
 
         // Test string with special characters

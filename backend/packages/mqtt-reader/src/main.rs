@@ -1,3 +1,8 @@
+// Enforce strict error handling in application code, but allow expect/unwrap in
+// tests
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+#![cfg_attr(not(test), deny(clippy::panic))]
+
 use std::pin::pin;
 
 use futures::StreamExt;
@@ -14,8 +19,10 @@ use tracing::{
     info,
 };
 
+type AppResult = Result<(), Box<dyn std::error::Error>>;
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> AppResult {
     tracing_subscriber::fmt::init();
 
     let read_config = read::config::Config::from_env();

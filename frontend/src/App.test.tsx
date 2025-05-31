@@ -1,5 +1,5 @@
 import React from "react";
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 
 import App from "./App";
@@ -51,7 +51,7 @@ describe("App", () => {
   });
 
   test("contains app title", () => {
-    const view = render(<App />);
-    expect(view.getByText("🏠 Ruuvi Home")).toBeInTheDocument();
+    render(<App />);
+    expect(screen.getByText("🏠 Ruuvi Home")).toBeInTheDocument();
   });
 });

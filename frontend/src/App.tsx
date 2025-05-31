@@ -179,7 +179,7 @@ const AppContent: React.FC = () => {
         </AppBar>
 
         {/* Main Content */}
-        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+        <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }} role="main">
           <ErrorBoundary>
             <Routes>
               <Route path="/" element={<Overview />} />

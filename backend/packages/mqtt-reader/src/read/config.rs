@@ -140,16 +140,16 @@ mod tests {
     fn test_config_edge_cases() {
         // Test empty strings
         let config = Config::new(
-            Some("".to_string()),
-            Some("".to_string()),
-            "".to_string(),
+            Some(String::new()),
+            Some(String::new()),
+            String::new(),
             0,
-            "".to_string(),
-            "".to_string(),
+            String::new(),
+            String::new(),
         );
 
-        assert_eq!(config.mqtt_username, Some("".to_string()));
-        assert_eq!(config.mqtt_password, Some("".to_string()));
+        assert_eq!(config.mqtt_username, Some(String::new()));
+        assert_eq!(config.mqtt_password, Some(String::new()));
         assert_eq!(config.mqtt_host, "");
         assert_eq!(config.mqtt_port, 0);
         assert_eq!(config.mqtt_topic, "");
