@@ -59,7 +59,7 @@ data_dir: "$DATA_DIR"
 log_dir: "$LOG_DIR"
 backup_dir: "$BACKUP_DIR"
 webhook_port: ${WEBHOOK_PORT:-9000}
-webhook_secret: "${WEBHOOK_SECRET:-}"
+webhook_secret: "${WEBHOOK_SECRET}"
 frontend_port: ${FRONTEND_PORT:-80}
 api_port: ${API_PORT:-3000}
 db_port: ${DB_PORT:-5432}
@@ -68,6 +68,10 @@ db_name: "${DB_NAME:-ruuvi_home}"
 mosquitto_port: ${MOSQUITTO_PORT:-1883}
 timezone: "${TZ:-Europe/Helsinki}"
 python_venv: "$PROJECT_DIR/.venv"
+postgres_password: "${POSTGRES_PASSWORD}"
+mqtt_password: "${MQTT_PASSWORD}"
+jwt_secret: "${JWT_SECRET}"
+session_secret: "${SESSION_SECRET}"
 EOF
     
     log_success "$context" "Runtime configuration created: $runtime_config"

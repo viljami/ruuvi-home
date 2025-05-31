@@ -36,19 +36,16 @@ database:
   port: "{{ ports.database }}"
   name: "ruuvi_home"
   user: "ruuvi"
-  password: "{{ POSTGRES_PASSWORD | default('change_me_in_production') }}"
 
 # MQTT Configuration
 mqtt:
   host: "mosquitto"
   port: "{{ ports.mosquitto }}"
   username: "ruuvi"
-  password: "{{ MQTT_PASSWORD | default('change_me_in_production') }}"
 
 # Webhook Configuration
 webhook:
   port: "{{ ports.webhook }}"
-  secret: "{{ WEBHOOK_SECRET | default('') }}"
 
 # System Configuration
 system:

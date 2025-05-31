@@ -20,6 +20,25 @@ readonly TEMPLATE_DIR="$SCRIPT_DIR/templates"
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
 
+# Generate secure passwords for services
+generate_secure_passwords() {
+    local context="$MAIN_CONTEXT"
+    
+    log_info "$context" "Generating secure passwords for services"
+    
+    # Generate secure random passwords
+    export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -base64 32)}"
+    export MQTT_PASSWORD="${MQTT_PASSWORD:-$(openssl rand -base64 32)}"
+    export WEBHOOK_SECRET="${WEBHOOK_SECRET:-$(openssl rand -base64 32)}"
+    
+    # Additional derived secrets
+    export JWT_SECRET="${JWT_SECRET:-$(openssl rand -base64 32)}"
+    export SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -base64 32)}"
+    
+    log_success "$context" "Secure passwords generated"
+    log_info "$context" "Passwords will be saved to .env file during setup"
+}
+
 # Load configuration from YAML
 load_config() {
     local config_file="$CONFIG_DIR/config.yaml"
@@ -69,6 +88,9 @@ print_header() {
     log_info "$context" "Setup target user: $RUUVI_USER"
     log_info "$context" "Project directory: $PROJECT_DIR"
     log_info "$context" "Configuration: $CONFIG_YAML"
+    
+    # Generate secure passwords if not already provided
+    generate_secure_passwords
 }
 
 # Validate script environment
@@ -148,6 +170,7 @@ execute_module() {
     # Set up module environment
     export SCRIPT_DIR MODULE_DIR LIB_DIR CONFIG_DIR TEMPLATE_DIR
     export RUUVI_USER PROJECT_DIR DATA_DIR LOG_DIR BACKUP_DIR CONFIG_YAML
+    export POSTGRES_PASSWORD MQTT_PASSWORD WEBHOOK_SECRET JWT_SECRET SESSION_SECRET
     
     # Execute module with error handling
     if bash "$module_path"; then
@@ -248,14 +271,24 @@ print_completion() {
     log_section "Setup Complete"
     log_success "$context" "Ruuvi Home setup completed successfully"
     log_info "$context" "Project installed in: $PROJECT_DIR"
+    log_success "$context" "All setup modules completed successfully"
     log_info "$context" "Services available: ruuvi-home, ruuvi-webhook"
     log_info "$context" "Setup summary: $PROJECT_DIR/setup-summary.log"
     
-    echo -e "\n${COLOR_YELLOW}Next Steps:${COLOR_NC}"
-    echo "1. Configure environment: nano $PROJECT_DIR/.env"
-    echo "2. Start services: sudo systemctl start ruuvi-home ruuvi-webhook"
-    echo "3. Check status: sudo systemctl status ruuvi-home"
-    echo "4. View logs: journalctl -u ruuvi-home -f"
+    echo -e "\n${COLOR_GREEN}Security Information:${COLOR_NC}"
+    echo "Secure passwords have been automatically generated and saved to:"
+    echo "  $PROJECT_DIR/.env"
+    echo ""
+    echo -e "${COLOR_YELLOW}Service Access:${COLOR_NC}"
+    echo "Frontend: http://$(hostname -I | awk '{print $1}'):80"
+    echo "API: http://$(hostname -I | awk '{print $1}'):3000"
+    echo "Webhook: http://$(hostname -I | awk '{print $1}'):9000"
+    echo ""
+    echo -e "${COLOR_YELLOW}Management Commands:${COLOR_NC}"
+    echo "1. Check status: sudo systemctl status ruuvi-home ruuvi-webhook"
+    echo "2. View logs: journalctl -u ruuvi-home -f"
+    echo "3. Access database: Use credentials from $PROJECT_DIR/.env"
+    echo "4. View passwords: cat $PROJECT_DIR/.env"
     echo ""
 }
 
