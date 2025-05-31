@@ -143,7 +143,7 @@ impl Df5Decoder {
     fn get_mac(&self, data: &ByteDataDf5) -> String {
         [data.10, data.11, data.12, data.13, data.14, data.15]
             .iter()
-            .map(|x| format!("{:02x}", x))
+            .map(|x| format!("{x:02x}"))
             .collect::<Vec<_>>()
             .join("")
     }
@@ -167,7 +167,7 @@ impl Decoder for Df5Decoder {
         // let rssi = &data[48..];
         let (acc_x, acc_y, acc_z) = self.get_acceleration(&byte_data);
         let acc = if let (Some(x), Some(y), Some(z)) = (acc_x, acc_y, acc_z) {
-            println!("x: {}, y: {}, z: {}", x, y, z);
+            println!("x: {x}, y: {y}, z: {z}");
             Some((((x as i64).pow(2) + (y as i64).pow(2) + (z as i64).pow(2)) as f32).sqrt())
         } else {
             None

@@ -190,26 +190,26 @@ EOF
 configure_timezone() {
     local context="$MODULE_CONTEXT"
     
-    log_info "$context" "Configuring system timezone: $TIMEZONE"
+    log_info "$context" "Configuring system timezone: $TZ"
     
     # Check current timezone
     local current_tz=$(timedatectl show -p Timezone --value)
     
-    if [ "$current_tz" = "$TIMEZONE" ]; then
-        log_success "$context" "Timezone already set to $TIMEZONE"
+    if [ "$current_tz" = "$TZ" ]; then
+        log_success "$context" "Timezone already set to $TZ"
         return 0
     fi
     
     # Set timezone
-    if ! timedatectl set-timezone "$TIMEZONE"; then
-        log_error "$context" "Failed to set timezone to $TIMEZONE"
+    if ! timedatectl set-timezone "$TZ"; then
+        log_error "$context" "Failed to set timezone to $TZ"
         return 1
     fi
     
     # Verify timezone change
     local new_tz=$(timedatectl show -p Timezone --value)
-    if [ "$new_tz" = "$TIMEZONE" ]; then
-        log_success "$context" "Timezone set to $TIMEZONE"
+    if [ "$new_tz" = "$TZ" ]; then
+        log_success "$context" "Timezone set to $TZ"
     else
         log_error "$context" "Timezone verification failed"
         return 1
@@ -231,22 +231,45 @@ configure_locale() {
         return 0
     fi
     
-    # Generate locale if not present
-    if ! locale -a | grep -q "en_US.utf8"; then
+    # Check if target locale is available, if not try alternatives
+    if ! locale -a | grep -q -E "(en_US\.utf8|en_US\.UTF-8)"; then
         log_info "$context" "Generating locale: $target_locale"
-        if ! locale-gen "$target_locale"; then
-            log_error "$context" "Failed to generate locale"
-            return 1
+        
+        # First ensure the locale is uncommented in /etc/locale.gen
+        if grep -q "^# *$target_locale" /etc/locale.gen; then
+            sed -i "s/^# *$target_locale/$target_locale/" /etc/locale.gen
+        elif ! grep -q "^$target_locale" /etc/locale.gen; then
+            echo "$target_locale UTF-8" >> /etc/locale.gen
+        fi
+        
+        # Generate the locale
+        if ! locale-gen; then
+            log_warn "$context" "Failed to generate $target_locale, checking for alternatives"
+            
+            # Try to use an existing UTF-8 locale as fallback
+            local fallback_locale=$(locale -a | grep -E "(en_.*\.utf8|en_.*\.UTF-8)" | head -1)
+            if [ -n "$fallback_locale" ]; then
+                target_locale="$fallback_locale"
+                log_info "$context" "Using fallback locale: $target_locale"
+            else
+                log_warn "$context" "No suitable UTF-8 locale available, skipping locale configuration"
+                return 0
+            fi
         fi
     fi
     
-    # Update locale
-    if ! update-locale LANG="$target_locale"; then
-        log_error "$context" "Failed to update locale"
-        return 1
+    # Update locale only if we have a valid target
+    if locale -a | grep -q -E "($(echo $target_locale | tr '[:upper:]' '[:lower:]')|$target_locale)"; then
+        if ! update-locale LANG="$target_locale" 2>/dev/null; then
+            log_warn "$context" "Failed to update locale to $target_locale, but continuing"
+            return 0
+        fi
+        log_success "$context" "Locale configured to $target_locale"
+    else
+        log_warn "$context" "Target locale $target_locale not available, skipping"
+        return 0
     fi
     
-    log_success "$context" "Locale configured"
     return 0
 }
 
@@ -337,8 +360,8 @@ validate_system_setup() {
     
     # Check timezone
     local current_tz=$(timedatectl show -p Timezone --value)
-    if [ "$current_tz" != "$TIMEZONE" ]; then
-        log_error "$context" "Timezone not set correctly: $current_tz (expected: $TIMEZONE)"
+    if [ "$current_tz" != "$TZ" ]; then
+        log_error "$context" "Timezone not set correctly: $current_tz (expected: $TZ)"
         validation_failed=true
     fi
     

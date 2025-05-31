@@ -381,7 +381,7 @@ impl PostgresStore {
         let query = format!(
             r#"
             SELECT
-                time_bucket(INTERVAL '{}', timestamp) AS bucket,
+                time_bucket(INTERVAL '{interval_str}', timestamp) AS bucket,
                 AVG(temperature) AS avg_temperature,
                 MIN(temperature) AS min_temperature,
                 MAX(temperature) AS max_temperature,
@@ -399,7 +399,6 @@ impl PostgresStore {
             GROUP BY bucket
             ORDER BY bucket
             "#,
-            interval_str
         );
 
         let rows = sqlx::query(&query)
@@ -593,8 +592,8 @@ impl PostgresStore {
 
         Ok(StorageEstimate {
             scenario: format!(
-                "{} sensors, {} sec intervals, {} years",
-                sensor_count, reading_interval_seconds, retention_years
+                "{sensor_count} sensors, {reading_interval_seconds} sec intervals, \
+                 {retention_years} years",
             ),
             total_readings: Some(total_readings),
             uncompressed_size_gb: Some(uncompressed_gb),
@@ -730,10 +729,10 @@ pub enum TimeInterval {
 impl TimeInterval {
     pub fn to_interval_string(&self) -> String {
         match self {
-            TimeInterval::Minutes(m) => format!("{} minutes", m),
-            TimeInterval::Hours(h) => format!("{} hours", h),
-            TimeInterval::Days(d) => format!("{} days", d),
-            TimeInterval::Weeks(w) => format!("{} weeks", w),
+            TimeInterval::Minutes(m) => format!("{m} minutes"),
+            TimeInterval::Hours(h) => format!("{h} hours"),
+            TimeInterval::Days(d) => format!("{d} days"),
+            TimeInterval::Weeks(w) => format!("{w} weeks"),
         }
     }
 }
