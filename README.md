@@ -25,6 +25,35 @@ Originally implemented in Python, this project has been ported to Rust for impro
 - Mosquitto MQTT broker
 - InfluxDB (for time-series data storage)
 
+## Development
+
+### AI Code Validation
+
+This project includes comprehensive code validation to ensure all changes meet quality standards. AI contributors must validate all code before submission.
+
+**Quick Validation:**
+```bash
+./scripts/ai-validate.sh
+```
+
+**Language-Specific Validation:**
+```bash
+./scripts/ai-validate.sh --rust       # Rust code
+./scripts/ai-validate.sh --typescript # TypeScript/React
+./scripts/ai-validate.sh --python     # Python scripts
+```
+
+**Documentation:**
+- [AI Coding Guidelines](AI_CODING_GUIDELINES.md) - Complete development rules
+- [AI Validation Guide](docs/AI_VALIDATION_GUIDE.md) - Step-by-step validation instructions
+
+All code must pass validation checks including:
+- Syntax validation
+- Linting (zero warnings)
+- Code formatting
+- Test execution
+- Pattern validation (orphaned tags, bracket matching)
+
 ## Project Structure
 
 ```
