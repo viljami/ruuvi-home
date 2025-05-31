@@ -282,10 +282,33 @@ install_monitoring_utilities() {
         log_info "$context" "Installing monitoring packages: ${missing_packages[*]}"
         
         export DEBIAN_FRONTEND=noninteractive
-        if ! apt-get update -qq && apt-get install -y -qq "${missing_packages[@]}"; then
-            log_warn "$context" "Some monitoring packages failed to install"
-        else
-            log_success "$context" "Monitoring packages installed"
+        
+        # Update package lists first
+        if ! apt-get update -qq; then
+            log_warn "$context" "Failed to update package lists, skipping monitoring utilities"
+            return 0
+        fi
+        
+        # Try to install packages individually to avoid total failure
+        local installed_packages=()
+        local failed_packages=()
+        
+        for package in "${missing_packages[@]}"; do
+            if apt-get install -y -qq "$package"; then
+                installed_packages+=("$package")
+                log_debug "$context" "Successfully installed: $package"
+            else
+                failed_packages+=("$package")
+                log_debug "$context" "Failed to install: $package"
+            fi
+        done
+        
+        if [ ${#installed_packages[@]} -gt 0 ]; then
+            log_success "$context" "Installed monitoring packages: ${installed_packages[*]}"
+        fi
+        
+        if [ ${#failed_packages[@]} -gt 0 ]; then
+            log_warn "$context" "Failed to install some monitoring packages: ${failed_packages[*]}"
         fi
     else
         log_success "$context" "All monitoring packages already installed"
@@ -423,7 +446,7 @@ setup_monitoring() {
     local context="$MODULE_CONTEXT"
     local setup_steps=(
         "verify_monitoring_scripts:Verify monitoring scripts"
-        "install_monitoring_utilities:Install monitoring utilities"
+        "install_monitoring_utilities:Install monitoring utilities (optional)"
         "configure_system_monitoring:Configure system monitoring"
         "configure_monitoring_log_rotation:Configure log rotation"
         "setup_alerting_system:Setup alerting system"
@@ -446,7 +469,12 @@ setup_monitoring() {
         log_step "$step_num" "$total_steps" "$step_desc"
         
         if ! $func_name; then
-            failed_steps+=("$step_desc")
+            # Make monitoring utilities installation non-critical
+            if [[ "$func_name" == "install_monitoring_utilities" ]]; then
+                log_warn "$context" "Non-critical step failed but continuing: $step_desc"
+            else
+                failed_steps+=("$step_desc")
+            fi
         fi
         
         ((step_num++))

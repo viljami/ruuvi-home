@@ -29,21 +29,25 @@ install_generator_dependencies() {
     
     log_info "$context" "Installing Python dependencies for file generator"
     
-    # Ensure pip3 is installed first
-    if ! command -v pip3 &> /dev/null; then
-        log_info "$context" "Installing pip3"
-        export DEBIAN_FRONTEND=noninteractive
-        if ! apt-get update -qq && apt-get install -y -qq python3-pip; then
-            log_error "$context" "Failed to install pip3"
-            return 1
-        fi
+    # Use system packages to avoid externally-managed-environment error
+    local system_packages=(
+        "python3-yaml"
+        "python3-jinja2"
+    )
+    
+    export DEBIAN_FRONTEND=noninteractive
+    
+    # Update package lists first
+    if ! apt-get update -qq; then
+        log_error "$context" "Failed to update package lists"
+        return 1
     fi
     
-    # Install required packages
-    for package in "${REQUIREMENTS[@]}"; do
-        log_debug "$context" "Installing: $package"
-        if ! pip3 install "$package" --quiet; then
-            log_error "$context" "Failed to install: $package"
+    # Install required system packages
+    for package in "${system_packages[@]}"; do
+        log_debug "$context" "Installing system package: $package"
+        if ! apt-get install -y -qq "$package"; then
+            log_error "$context" "Failed to install system package: $package"
             return 1
         fi
     done

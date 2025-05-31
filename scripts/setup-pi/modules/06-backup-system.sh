@@ -128,9 +128,9 @@ EOF
     chmod 644 "$CRON_FILE"
     chown root:root "$CRON_FILE"
     
-    # Validate cron syntax
-    if ! crontab -T "$CRON_FILE" 2>/dev/null; then
-        log_error "$context" "Invalid cron syntax in backup configuration"
+    # Basic cron syntax validation (crontab -T not available on all systems)
+    if ! grep -q "^$BACKUP_SCHEDULE.*$RUUVI_USER.*$BACKUP_SCRIPT" "$CRON_FILE"; then
+        log_error "$context" "Backup cron job not properly configured"
         return 1
     fi
     

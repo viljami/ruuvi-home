@@ -169,41 +169,52 @@ configure_firewall() {
     
     log_info "$context" "Configuring firewall rules"
     
-    # Check if UFW is available
+    # Check if UFW is available, try to install if not
     if ! command -v ufw &> /dev/null; then
-        log_warn "$context" "UFW not installed, skipping firewall configuration"
-        return 0
+        log_info "$context" "UFW not installed, attempting to install"
+        export DEBIAN_FRONTEND=noninteractive
+        if apt-get update -qq && apt-get install -y -qq ufw; then
+            log_success "$context" "UFW installed successfully"
+        else
+            log_warn "$context" "Could not install UFW, skipping firewall configuration"
+            return 0
+        fi
     fi
     
     # Enable UFW if not already enabled
     if ! ufw status | grep -q "Status: active"; then
         log_info "$context" "Enabling UFW firewall"
         if ! ufw --force enable; then
-            log_error "$context" "Failed to enable UFW"
-            return 1
+            log_warn "$context" "Failed to enable UFW, continuing without firewall"
+            return 0
         fi
     fi
     
-    # Allow SSH (important - don't lock ourselves out)
-    ufw allow ssh &>/dev/null || log_warn "$context" "SSH rule already exists"
+    # Configure firewall rules with error handling
+    local firewall_rules=(
+        "ufw allow ssh:Allow SSH access"
+        "ufw allow 80/tcp:Allow HTTP for frontend"
+        "ufw allow 443/tcp:Allow HTTPS for frontend"
+        "ufw allow from 192.168.0.0/16 to any port 3000:Allow API from 192.168.x.x"
+        "ufw allow from 10.0.0.0/8 to any port 3000:Allow API from 10.x.x.x"
+        "ufw allow from 172.16.0.0/12 to any port 3000:Allow API from 172.16-31.x.x"
+        "ufw allow 9000/tcp:Allow webhook port"
+        "ufw deny 5432/tcp:Deny direct database access"
+        "ufw deny 1883/tcp:Deny direct MQTT access"
+    )
     
-    # Allow HTTP and HTTPS for frontend
-    ufw allow 80/tcp &>/dev/null || log_warn "$context" "HTTP rule already exists"
-    ufw allow 443/tcp &>/dev/null || log_warn "$context" "HTTPS rule already exists"
+    for rule_entry in "${firewall_rules[@]}"; do
+        local rule_cmd="${rule_entry%:*}"
+        local rule_desc="${rule_entry#*:}"
+        
+        if $rule_cmd &>/dev/null; then
+            log_debug "$context" "Firewall rule applied: $rule_desc"
+        else
+            log_warn "$context" "Firewall rule failed or already exists: $rule_desc"
+        fi
+    done
     
-    # Allow API port from local network only
-    ufw allow from 192.168.0.0/16 to any port 3000 &>/dev/null || log_warn "$context" "API rule already exists"
-    ufw allow from 10.0.0.0/8 to any port 3000 &>/dev/null || log_warn "$context" "API rule already exists"
-    ufw allow from 172.16.0.0/12 to any port 3000 &>/dev/null || log_warn "$context" "API rule already exists"
-    
-    # Allow webhook port from anywhere (GitHub webhooks)
-    ufw allow 9000/tcp &>/dev/null || log_warn "$context" "Webhook rule already exists"
-    
-    # Deny direct access to database and MQTT ports
-    ufw deny 5432/tcp &>/dev/null || log_warn "$context" "Database deny rule already exists"
-    ufw deny 1883/tcp &>/dev/null || log_warn "$context" "MQTT deny rule already exists"
-    
-    log_success "$context" "Firewall rules configured"
+    log_success "$context" "Firewall configuration completed"
     return 0
 }
 
@@ -265,7 +276,7 @@ setup_systemd_services() {
         "enable_services:Enable services"
         "start_services:Start services"
         "validate_services:Validate service health"
-        "configure_firewall:Configure firewall"
+        "configure_firewall:Configure firewall (optional)"
         "show_service_status:Show service status"
     )
     
@@ -283,12 +294,17 @@ setup_systemd_services() {
         log_step "$step_num" "$total_steps" "$step_desc"
         
         if ! $func_name; then
-            failed_steps+=("$step_desc")
-            
-            # If critical step fails, try to stop services
-            if [[ "$func_name" == "start_services" || "$func_name" == "validate_services" ]]; then
-                log_warn "$context" "Critical step failed, stopping services for cleanup"
-                stop_services || log_error "$context" "Failed to stop services during cleanup"
+            # Make firewall configuration non-critical
+            if [[ "$func_name" == "configure_firewall" ]]; then
+                log_warn "$context" "Non-critical step failed but continuing: $step_desc"
+            else
+                failed_steps+=("$step_desc")
+                
+                # If critical step fails, try to stop services
+                if [[ "$func_name" == "start_services" || "$func_name" == "validate_services" ]]; then
+                    log_warn "$context" "Critical step failed, stopping services for cleanup"
+                    stop_services || log_error "$context" "Failed to stop services during cleanup"
+                fi
             fi
         fi
         
