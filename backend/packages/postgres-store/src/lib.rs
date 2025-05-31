@@ -37,6 +37,7 @@ pub struct Event {
 }
 
 impl Event {
+    #[allow(clippy::too-many-arguments)]
     pub fn new_with_current_time(
         sensor_mac: String,
         gateway_mac: String,
