@@ -7,6 +7,13 @@ on:
     branches: [main]
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      force_build_all:
+        description: "Force build all Docker images"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -32,7 +39,7 @@ jobs:
           POSTGRES_USER: ruuvi
           POSTGRES_PASSWORD: ruuvi_secret
           POSTGRES_HOST_AUTH_METHOD: trust
-          TIMESCALEDB_TELEMETRY: 'off'
+          TIMESCALEDB_TELEMETRY: "off"
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -160,16 +167,50 @@ jobs:
   #       run: |
   #         docker compose -f docker-compose-test.yaml down -v
 
-  # Build multi-architecture Docker images
-  build-images:
+  # Detect changes in different service components
+  detect-changes:
     runs-on: ubuntu-latest
-    name: Build Docker Images
-    needs: [test-backend, test-frontend, test-simulator]
+    name: Detect Changes
     if: github.event_name != 'pull_request'
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      mqtt-simulator: ${{ steps.changes.outputs.mqtt-simulator }}
+      docker: ${{ steps.changes.outputs.docker }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    strategy:
-      matrix:
-        service: [mqtt-reader, api-server, mqtt-simulator, frontend]
+      - name: Check for changes
+        uses: dorny/paths-filter@v2
+        id: changes
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'docker/mqtt-reader.Dockerfile'
+              - 'docker/api-server.Dockerfile'
+            frontend:
+              - 'frontend/**'
+              - 'docker/frontend.Dockerfile'
+            mqtt-simulator:
+              - 'docker/mqtt-simulator/**'
+            docker:
+              - 'docker/**'
+              - 'docker-compose*.yaml'
+              - '.dockerignore'
+
+  # Build MQTT Reader Docker image
+  build-mqtt-reader:
+    runs-on: ubuntu-latest
+    name: Build MQTT Reader
+    needs: [test-backend, detect-changes]
+    if: |
+      github.event_name != 'pull_request' &&
+      (needs.detect-changes.outputs.backend == 'true' ||
+      needs.detect-changes.outputs.docker == 'true' ||
+      github.event_name == 'release' ||
+      github.event.inputs.force_build_all == 'true')
 
     steps:
       - name: Checkout code
@@ -189,7 +230,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-reader
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -198,24 +239,11 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Network connectivity check
-        run: |
-          echo "Checking network connectivity..."
-          ping -c 3 8.8.8.8 || echo "Warning: Network connectivity issues detected"
-          nslookup deb.debian.org || echo "Warning: DNS resolution issues detected"
-
-      - name: Build and push Docker image (attempt 1)
-        id: build_attempt_1
-        continue-on-error: true
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: >-
-            ${{ matrix.service == 'mqtt-simulator' &&
-            './docker/mqtt-simulator' || '.' }}
-          file: >-
-            ${{ matrix.service == 'mqtt-simulator' &&
-            './docker/mqtt-simulator/Dockerfile' ||
-            format('docker/{0}.Dockerfile', matrix.service) }}
+          context: .
+          file: docker/mqtt-reader.Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -223,26 +251,50 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Clean Docker cache and retry build (attempt 2)
-        if: steps.build_attempt_1.outcome == 'failure'
-        run: |
-          echo "First build attempt failed, cleaning cache and retrying..."
-          docker builder prune -f
-          sleep 10
+  # Build API Server Docker image
+  build-api-server:
+    runs-on: ubuntu-latest
+    name: Build API Server
+    needs: [test-backend, detect-changes]
+    if: |
+      github.event_name != 'pull_request' &&
+      (needs.detect-changes.outputs.backend == 'true' ||
+      needs.detect-changes.outputs.docker == 'true' ||
+      github.event_name == 'release' ||
+      github.event.inputs.force_build_all == 'true')
 
-      - name: Build and push Docker image (attempt 2)
-        if: steps.build_attempt_1.outcome == 'failure'
-        id: build_attempt_2
-        continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-server
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: >-
-            ${{ matrix.service == 'mqtt-simulator' &&
-            './docker/mqtt-simulator' || '.' }}
-          file: >-
-            ${{ matrix.service == 'mqtt-simulator' &&
-            './docker/mqtt-simulator/Dockerfile' ||
-            format('docker/{0}.Dockerfile', matrix.service) }}
+          context: .
+          file: docker/api-server.Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -250,37 +302,154 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Final build attempt (attempt 3)
-        if: steps.build_attempt_1.outcome == 'failure' && steps.build_attempt_2.outcome == 'failure'
-        run: |
-          echo "Second build attempt failed, final retry with reduced platforms..."
-          docker builder prune -f
-          sleep 15
+  # Build Frontend Docker image
+  build-frontend:
+    runs-on: ubuntu-latest
+    name: Build Frontend
+    needs: [test-frontend, detect-changes]
+    if: |
+      github.event_name != 'pull_request' &&
+      (needs.detect-changes.outputs.frontend == 'true' ||
+      needs.detect-changes.outputs.docker == 'true' ||
+      github.event_name == 'release' ||
+      github.event.inputs.force_build_all == 'true')
 
-      - name: Build and push Docker image (final attempt - amd64 only)
-        if: steps.build_attempt_1.outcome == 'failure' && steps.build_attempt_2.outcome == 'failure'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: >-
-            ${{ matrix.service == 'mqtt-simulator' &&
-            './docker/mqtt-simulator' || '.' }}
-          file: >-
-            ${{ matrix.service == 'mqtt-simulator' &&
-            './docker/mqtt-simulator/Dockerfile' ||
-            format('docker/{0}.Dockerfile', matrix.service) }}
+          context: .
+          file: docker/frontend.Dockerfile
           platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # Build MQTT Simulator Docker image
+  build-mqtt-simulator:
+    runs-on: ubuntu-latest
+    name: Build MQTT Simulator
+    needs: [test-simulator, detect-changes]
+    if: |
+      github.event_name != 'pull_request' &&
+      (needs.detect-changes.outputs.mqtt-simulator == 'true' ||
+      needs.detect-changes.outputs.docker == 'true' ||
+      github.event_name == 'release' ||
+      github.event.inputs.force_build_all == 'true')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-simulator
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker/mqtt-simulator
+          file: ./docker/mqtt-simulator/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build Summary - coordinates all build jobs
+  build-summary:
+    runs-on: ubuntu-latest
+    name: Build Summary
+    needs:
+      [
+        build-mqtt-reader,
+        build-api-server,
+        build-frontend,
+        build-mqtt-simulator,
+      ]
+    if: always() && github.event_name != 'pull_request'
+    outputs:
+      build_success: ${{ steps.summary.outputs.build_success }}
+
+    steps:
+      - name: Evaluate build results
+        id: summary
+        run: |
+          echo "MQTT Reader: ${{ needs.build-mqtt-reader.result }}"
+          echo "API Server: ${{ needs.build-api-server.result }}"
+          echo "Frontend: ${{ needs.build-frontend.result }}"
+          echo "MQTT Simulator: ${{ needs.build-mqtt-simulator.result }}"
+
+          # Check if all builds that ran were successful
+          if [[ "${{ needs.build-mqtt-reader.result }}" =~ ^(success|skipped)$ ]] && \
+             [[ "${{ needs.build-api-server.result }}" =~ ^(success|skipped)$ ]] && \
+             [[ "${{ needs.build-frontend.result }}" =~ ^(success|skipped)$ ]] && \
+             [[ "${{ needs.build-mqtt-simulator.result }}" =~ ^(success|skipped)$ ]]; then
+            echo "build_success=true" >> $GITHUB_OUTPUT
+            echo "✅ All builds completed successfully"
+          else
+            echo "build_success=false" >> $GITHUB_OUTPUT
+            echo "❌ One or more builds failed"
+            exit 1
+          fi
 
   # Deploy to Raspberry Pi (only on main branch)
   deploy-pi:
     runs-on: ubuntu-latest
     name: Deploy to Raspberry Pi
-    needs: [build-images]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [build-summary]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'release') &&
+      needs.build-summary.outputs.build_success == 'true'
 
     steps:
       - name: Checkout code
@@ -355,30 +524,89 @@ jobs:
           echo "Deployment failed, attempting rollback..."
           ssh ${PI_USER}@${PI_HOST} "cd /home/pi/ruuvi-home && git reset --hard HEAD~1 && docker compose up -d"
 
-  # Security scan
-  security-scan:
+  # Security scan for MQTT Reader
+  security-scan-mqtt-reader:
     runs-on: ubuntu-latest
-    name: Security Scan
-    needs: build-images
-    if: github.event_name != 'pull_request'
-
-    strategy:
-      matrix:
-        service: [mqtt-reader, api-server, mqtt-simulator, frontend]
+    name: Security Scan MQTT Reader
+    needs: [build-mqtt-reader]
+    if: needs.build-mqtt-reader.result == 'success'
 
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-reader:${{ github.sha }}
           format: "sarif"
-          output: "trivy-results-${{ matrix.service }}.sarif"
+          output: "trivy-results-mqtt-reader.sarif"
 
       - name: Upload Trivy scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v2
         if: always()
         with:
-          sarif_file: "trivy-results-${{ matrix.service }}.sarif"
+          sarif_file: "trivy-results-mqtt-reader.sarif"
+
+  # Security scan for API Server
+  security-scan-api-server:
+    runs-on: ubuntu-latest
+    name: Security Scan API Server
+    needs: [build-api-server]
+    if: needs.build-api-server.result == 'success'
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-server:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-results-api-server.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results-api-server.sarif"
+
+  # Security scan for Frontend
+  security-scan-frontend:
+    runs-on: ubuntu-latest
+    name: Security Scan Frontend
+    needs: [build-frontend]
+    if: needs.build-frontend.result == 'success'
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-results-frontend.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results-frontend.sarif"
+
+  # Security scan for MQTT Simulator
+  security-scan-mqtt-simulator:
+    runs-on: ubuntu-latest
+    name: Security Scan MQTT Simulator
+    needs: [build-mqtt-simulator]
+    if: needs.build-mqtt-simulator.result == 'success'
+
+    steps:
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-simulator:${{ github.sha }}
+          format: "sarif"
+          output: "trivy-results-mqtt-simulator.sarif"
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-results-mqtt-simulator.sarif"
 
   # Notify on deployment
   notify:
