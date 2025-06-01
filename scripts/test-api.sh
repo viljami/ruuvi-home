@@ -57,11 +57,11 @@ if SENSORS_RESPONSE=$(curl -f -s "$API_URL/api/sensors"); then
     SENSOR_COUNT=$(echo "$SENSORS_RESPONSE" | jq length 2>/dev/null || echo "0")
     if [ "$SENSOR_COUNT" -gt 0 ]; then
         test_pass "Sensors endpoint returns $SENSOR_COUNT sensors"
-        
+
         # Get first sensor MAC for further testing
         FIRST_SENSOR_MAC=$(echo "$SENSORS_RESPONSE" | jq -r '.[0].sensor_mac' 2>/dev/null)
         test_info "First sensor MAC: $FIRST_SENSOR_MAC"
-        
+
         # Validate JSON structure
         if echo "$SENSORS_RESPONSE" | jq -e '.[0] | has("sensor_mac") and has("gateway_mac") and has("temperature")' > /dev/null 2>&1; then
             test_pass "Sensor data has required fields"
@@ -83,7 +83,7 @@ if [ -n "$FIRST_SENSOR_MAC" ] && [ "$FIRST_SENSOR_MAC" != "null" ]; then
     echo "🔄 Testing latest reading endpoint..."
     if LATEST_RESPONSE=$(curl -f -s "$API_URL/api/sensors/$FIRST_SENSOR_MAC/latest"); then
         test_pass "Latest reading endpoint accessible"
-        
+
         # Check if MAC matches
         RETURNED_MAC=$(echo "$LATEST_RESPONSE" | jq -r '.sensor_mac' 2>/dev/null)
         if [ "$RETURNED_MAC" = "$FIRST_SENSOR_MAC" ]; then
@@ -91,7 +91,7 @@ if [ -n "$FIRST_SENSOR_MAC" ] && [ "$FIRST_SENSOR_MAC" != "null" ]; then
         else
             test_fail "MAC mismatch: expected $FIRST_SENSOR_MAC, got $RETURNED_MAC"
         fi
-        
+
         # Check temperature value
         TEMP=$(echo "$LATEST_RESPONSE" | jq -r '.temperature' 2>/dev/null)
         if [[ "$TEMP" =~ ^-?[0-9]+\.?[0-9]*$ ]]; then
@@ -109,7 +109,7 @@ if [ -n "$FIRST_SENSOR_MAC" ] && [ "$FIRST_SENSOR_MAC" != "null" ]; then
     if HISTORY_RESPONSE=$(curl -f -s "$API_URL/api/sensors/$FIRST_SENSOR_MAC/history?limit=5"); then
         HISTORY_COUNT=$(echo "$HISTORY_RESPONSE" | jq length 2>/dev/null || echo "0")
         test_pass "History endpoint accessible, returned $HISTORY_COUNT records"
-        
+
         if [ "$HISTORY_COUNT" -gt 0 ]; then
             # Check if data is sorted by timestamp (descending)
             FIRST_TS=$(echo "$HISTORY_RESPONSE" | jq -r '.[0].timestamp' 2>/dev/null)
@@ -199,7 +199,6 @@ else
     echo ""
     echo "Common issues:"
     echo "  • API server not running: docker-compose up api-server"
-    echo "  • InfluxDB not ready: docker-compose logs influxdb"
     echo "  • No sensor data: check MQTT simulator"
     exit 1
 fi

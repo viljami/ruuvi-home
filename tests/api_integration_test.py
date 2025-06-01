@@ -13,13 +13,12 @@ from typing import Dict, List, Any
 
 # Test configuration
 API_BASE_URL = "http://localhost:8080"
-INFLUXDB_URL = "http://localhost:8086"
 MQTT_SIMULATOR_SENSORS = ["AA:BB:CC:DD:EE:01", "AA:BB:CC:DD:EE:02", "AA:BB:CC:DD:EE:03"]
 GATEWAY_MAC = "AA:BB:CC:DD:EE:FF"
 
 class TestAPIHealth:
     """Test health check endpoint"""
-    
+
     def test_health_endpoint_returns_ok(self):
         """Health endpoint should return 200 OK"""
         response = requests.get(f"{API_BASE_URL}/health")
@@ -32,18 +31,18 @@ class TestAPIHealth:
         start_time = time.time()
         response = requests.get(f"{API_BASE_URL}/health")
         response_time = time.time() - start_time
-        
+
         assert response.status_code == 200
         assert response_time < 1.0  # Should respond within 1 second
 
 class TestSensorsEndpoint:
     """Test sensors list endpoint"""
-    
+
     def test_get_sensors_returns_json_array(self):
         """GET /api/sensors should return JSON array"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         data = response.json()
         assert isinstance(data, list)
         assert response.headers.get("content-type") == "application/json"
@@ -52,18 +51,18 @@ class TestSensorsEndpoint:
         """Sensor objects should have required fields"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         if sensors:  # If we have sensors
             sensor = sensors[0]
             required_fields = [
-                "sensor_mac", "gateway_mac", "temperature", "humidity", 
+                "sensor_mac", "gateway_mac", "temperature", "humidity",
                 "pressure", "battery", "tx_power", "movement_counter",
-                "measurement_sequence_number", "acceleration", 
-                "acceleration_x", "acceleration_y", "acceleration_z", 
+                "measurement_sequence_number", "acceleration",
+                "acceleration_x", "acceleration_y", "acceleration_z",
                 "rssi", "timestamp"
             ]
-            
+
             for field in required_fields:
                 assert field in sensor, f"Missing required field: {field}"
 
@@ -71,15 +70,15 @@ class TestSensorsEndpoint:
         """Sensor data should have correct types"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         if sensors:
             sensor = sensors[0]
-            
+
             # String fields
             assert isinstance(sensor["sensor_mac"], str)
             assert isinstance(sensor["gateway_mac"], str)
-            
+
             # Numeric fields
             assert isinstance(sensor["temperature"], (int, float))
             assert isinstance(sensor["humidity"], (int, float))
@@ -99,7 +98,7 @@ class TestSensorsEndpoint:
         """Sensor MAC addresses should be properly formatted"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         for sensor in sensors:
             mac = sensor["sensor_mac"]
@@ -114,20 +113,20 @@ class TestSensorsEndpoint:
 
 class TestSensorLatestEndpoint:
     """Test latest sensor reading endpoint"""
-    
+
     def test_get_latest_reading_valid_sensor(self):
         """GET /api/sensors/{mac}/latest should return sensor data"""
         # First get available sensors
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/latest")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert data["sensor_mac"] == sensor_mac
@@ -142,39 +141,39 @@ class TestSensorLatestEndpoint:
         """Latest reading should have a recent timestamp"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/latest")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Timestamp should be within last 24 hours (as per our query)
         now = int(time.time())
         twenty_four_hours_ago = now - (24 * 60 * 60)
-        
+
         assert data["timestamp"] >= twenty_four_hours_ago
         assert data["timestamp"] <= now
 
 class TestSensorHistoryEndpoint:
     """Test sensor history endpoint"""
-    
+
     def test_get_history_default_parameters(self):
         """GET /api/sensors/{mac}/history should work with default parameters"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/history")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -183,15 +182,15 @@ class TestSensorHistoryEndpoint:
         """History endpoint should respect limit parameter"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
         limit = 5
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/history?limit={limit}")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -201,14 +200,14 @@ class TestSensorHistoryEndpoint:
         """History endpoint should respect start and end parameters"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/history?start=-30m&end=-10m")
-        
+
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -217,17 +216,17 @@ class TestSensorHistoryEndpoint:
         """History should be sorted by time (newest first)"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/history?limit=10")
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         if len(data) > 1:
             # Should be sorted by timestamp descending (newest first)
             for i in range(len(data) - 1):
@@ -241,7 +240,7 @@ class TestSensorHistoryEndpoint:
 
 class TestErrorHandling:
     """Test API error handling"""
-    
+
     def test_invalid_endpoint_returns_404(self):
         """Invalid endpoints should return 404"""
         response = requests.get(f"{API_BASE_URL}/api/invalid")
@@ -250,7 +249,7 @@ class TestErrorHandling:
     def test_invalid_sensor_mac_format(self):
         """Invalid MAC format should be handled gracefully"""
         invalid_macs = ["invalid", "12:34", "XX:YY:ZZ:AA:BB:CC:DD"]
-        
+
         for mac in invalid_macs:
             response = requests.get(f"{API_BASE_URL}/api/sensors/{mac}/latest")
             # Should return 404 or handle gracefully (not 500)
@@ -260,25 +259,25 @@ class TestErrorHandling:
         """Malformed query parameters should be handled gracefully"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
-        
+
         # Test invalid limit
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/history?limit=invalid")
         assert response.status_code in [200, 400]  # Should handle gracefully
 
 class TestDataIntegrity:
     """Test data integrity and business logic"""
-    
+
     def test_temperature_values_reasonable(self):
         """Temperature values should be in reasonable range"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         for sensor in sensors:
             temp = sensor["temperature"]
@@ -289,7 +288,7 @@ class TestDataIntegrity:
         """Humidity values should be in valid range (0-100%)"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         for sensor in sensors:
             humidity = sensor["humidity"]
@@ -299,7 +298,7 @@ class TestDataIntegrity:
         """Pressure values should be in reasonable range"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         for sensor in sensors:
             pressure = sensor["pressure"]
@@ -310,7 +309,7 @@ class TestDataIntegrity:
         """All sensors should report the same gateway MAC"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         if len(sensors) > 1:
             gateway_macs = set(sensor["gateway_mac"] for sensor in sensors)
@@ -318,13 +317,13 @@ class TestDataIntegrity:
 
 class TestPerformance:
     """Test API performance characteristics"""
-    
+
     def test_sensors_endpoint_performance(self):
         """Sensors endpoint should respond within reasonable time"""
         start_time = time.time()
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         response_time = time.time() - start_time
-        
+
         assert response.status_code == 200
         assert response_time < 5.0  # Should respond within 5 seconds
 
@@ -332,17 +331,17 @@ class TestPerformance:
         """Latest reading endpoint should respond quickly"""
         sensors_response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert sensors_response.status_code == 200
-        
+
         sensors = sensors_response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         sensor_mac = sensors[0]["sensor_mac"]
-        
+
         start_time = time.time()
         response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/latest")
         response_time = time.time() - start_time
-        
+
         assert response.status_code == 200
         assert response_time < 3.0  # Should respond within 3 seconds
 
@@ -350,32 +349,32 @@ class TestPerformance:
         """API should handle multiple concurrent requests"""
         import concurrent.futures
         import threading
-        
+
         def make_request():
             response = requests.get(f"{API_BASE_URL}/health")
             return response.status_code
-        
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(make_request) for _ in range(20)]
             results = [future.result() for future in futures]
-        
+
         # All requests should succeed
         assert all(status == 200 for status in results)
 
 class TestEndToEndDataFlow:
     """Test complete data flow from MQTT to API"""
-    
+
     def test_mqtt_simulator_data_appears_in_api(self):
         """Data from MQTT simulator should appear in API"""
         # Wait a bit for data to flow through the system
         time.sleep(10)
-        
+
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         assert len(sensors) > 0, "No sensors found - MQTT data may not be flowing"
-        
+
         # Check if simulator sensor MACs appear
         sensor_macs = [sensor["sensor_mac"] for sensor in sensors]
         simulator_macs_found = any(mac in sensor_macs for mac in MQTT_SIMULATOR_SENSORS)
@@ -385,45 +384,45 @@ class TestEndToEndDataFlow:
         """Data should be fresh (recently received)"""
         response = requests.get(f"{API_BASE_URL}/api/sensors")
         assert response.status_code == 200
-        
+
         sensors = response.json()
         if not sensors:
             pytest.skip("No sensors available for testing")
-        
+
         # Data should be from within the last 10 minutes
         ten_minutes_ago = int(time.time()) - (10 * 60)
-        
+
         fresh_sensors = [s for s in sensors if s["timestamp"] > ten_minutes_ago]
         assert len(fresh_sensors) > 0, "No fresh sensor data found"
 
 def run_basic_api_validation():
     """Quick validation function for manual testing"""
     print("🧪 Running basic API validation...")
-    
+
     try:
         # Health check
         response = requests.get(f"{API_BASE_URL}/health", timeout=5)
         print(f"✅ Health check: {response.status_code} - {response.text}")
-        
+
         # Sensors list
         response = requests.get(f"{API_BASE_URL}/api/sensors", timeout=10)
         sensors = response.json()
         print(f"✅ Sensors endpoint: {response.status_code} - Found {len(sensors)} sensors")
-        
+
         if sensors:
             # Latest reading
             sensor_mac = sensors[0]["sensor_mac"]
             response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/latest", timeout=10)
             print(f"✅ Latest reading: {response.status_code} - Sensor: {sensor_mac}")
-            
+
             # History
             response = requests.get(f"{API_BASE_URL}/api/sensors/{sensor_mac}/history?limit=5", timeout=10)
             history = response.json()
             print(f"✅ History endpoint: {response.status_code} - {len(history)} records")
-        
+
         print("🎉 Basic API validation passed!")
         return True
-        
+
     except Exception as e:
         print(f"❌ API validation failed: {e}")
         return False

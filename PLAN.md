@@ -3,6 +3,7 @@
 ## Current Architecture Assessment
 
 The project is already structured as a Rust workspace with several packages:
+
 - `mqtt-reader`: Connects to MQTT and reads Ruuvi Gateway data
 - `ruuvi-decoder`: Decodes the Ruuvi Tag data formats
 - `orchestrator`: Coordinates the components
@@ -33,16 +34,19 @@ Here's a simplified architecture that aligns with the milestones:
 ### Components
 
 1. **Data Collector** (Milestone 1)
+
    - MQTT client connecting to Mosquitto
    - Ruuvi data decoder
    - Simple configuration for MQTT connection
 
 2. **Data Storage** (Milestone 2)
+
    - Efficient data storage solution
    - Query capabilities for historical data
    - Time-series optimization
 
 3. **API Server** (Milestone 3)
+
    - REST API for querying historical data
    - WebSocket server for real-time updates
    - Data aggregation and processing
@@ -64,7 +68,7 @@ Here's a simplified architecture that aligns with the milestones:
 
 For time-series sensor data:
 
-- **InfluxDB** is ideal for time-series data and has good Rust support
+- **TimeseriesDB** is ideal for time-series data and has good Rust support
 - Lightweight enough for a Raspberry Pi
 - Provides good query capabilities for time-series data
 - Has retention policies for managing data growth
@@ -96,16 +100,19 @@ For the monorepo approach:
 ## Development Workflow
 
 ### 1. Local Development
+
 - Use Docker for local development to simulate the Raspberry Pi environment
-- Docker Compose to run all services (InfluxDB, Mosquitto, your Rust app)
+- Docker Compose to run all services (TimeseriesDB, Mosquitto, your Rust app)
 - Hot reloading for faster development
 
 ### 2. Testing
+
 - Unit tests for individual components
 - Integration tests for the full system
 - Mock MQTT server for testing without real hardware
 
 ### 3. CI/CD with GitHub Actions
+
 - Automatic testing on push
 - Build artifacts for Raspberry Pi (cross-compilation)
 - Deployment scripts for pushing to your Raspberry Pi
@@ -121,7 +128,7 @@ For the monorepo approach:
 
 ### Milestone 2: Data Storage
 
-1. Implement InfluxDB client in Rust
+1. Implement TimescaleDb client in Rust
 2. Create data models and storage schemas
 3. Implement data retention and optimization policies
 4. Add query capabilities for historical data
@@ -167,13 +174,15 @@ ruuvi-home/
 ## Next Steps
 
 1. **Refactor Existing Code**
+
    - Review and clean up the existing packages
    - Update naming for clarity
    - Add missing documentation
 
 2. **Set Up Development Environment**
+
    - Create Docker Compose file for local development
-   - Set up InfluxDB container
+   - Set up TimescaleDb container
    - Configure Mosquitto for testing
 
 3. **Start with Milestone 1**
@@ -184,11 +193,13 @@ ruuvi-home/
 ## Key Considerations
 
 1. **Raspberry Pi Resource Constraints**
+
    - Optimize for memory and CPU usage
    - Consider data retention strategies to manage storage
    - Use efficient serialization formats (Cap'n Proto already selected)
 
 2. **Development Experience**
+
    - Create a seamless local development environment
    - Make deployment to Raspberry Pi simple and reliable
    - Ensure good logging and error reporting

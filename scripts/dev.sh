@@ -31,8 +31,6 @@ fi
 mkdir -p "${PROJECT_ROOT}/docker/mosquitto/config"
 mkdir -p "${PROJECT_ROOT}/docker/mosquitto/data"
 mkdir -p "${PROJECT_ROOT}/docker/mosquitto/log"
-mkdir -p "${PROJECT_ROOT}/docker/influxdb/data"
-mkdir -p "${PROJECT_ROOT}/docker/influxdb/config"
 
 usage() {
     echo -e "${GREEN}Ruuvi Home Development Script${NC}"
@@ -53,7 +51,6 @@ start_dev_environment() {
     echo -e "${GREEN}Starting Ruuvi Home development environment...${NC}"
     docker compose -f "${DOCKER_COMPOSE}" up -d
     echo -e "${GREEN}Development environment is running!${NC}"
-    echo -e "InfluxDB UI:       ${YELLOW}http://localhost:8086${NC}"
     echo -e "API Server:        ${YELLOW}http://localhost:8080${NC}"
     echo -e "Frontend:          ${YELLOW}http://localhost:3000${NC}"
 }

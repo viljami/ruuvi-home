@@ -232,11 +232,11 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::unwrap_used)]
     fn test_serde_deserialization() {
         // Test that serde can deserialize our query structs
         let json = r#"{"start": "2024-01-01T00:00:00Z", "limit": 100}"#;
-        let query: HistoricalQuery = serde_json::from_str(json).unwrap();
+        #[allow(clippy::expect_used)]
+        let query: HistoricalQuery = serde_json::from_str(json).expect("json");
 
         assert_eq!(query.start, Some("2024-01-01T00:00:00Z".to_string()));
         assert_eq!(query.limit, Some(100));

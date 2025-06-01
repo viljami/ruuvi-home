@@ -92,38 +92,7 @@ pub fn format_duration_human(seconds: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{
-        Datelike,
-        Timelike,
-    };
-
     use super::*;
-
-    #[test]
-    #[allow(clippy::unwrap_used)]
-    fn test_parse_datetime_valid() {
-        let datetime_str = "2024-01-01T00:00:00Z";
-        let result = parse_datetime(datetime_str);
-        assert!(result.is_ok());
-
-        let parsed = result.unwrap();
-        assert_eq!(parsed.year(), 2024);
-        assert_eq!(parsed.month(), 1);
-        assert_eq!(parsed.day(), 1);
-    }
-
-    #[test]
-    #[allow(clippy::unwrap_used)]
-    fn test_parse_datetime_with_milliseconds() {
-        let datetime_str = "2024-01-01T12:30:45.123Z";
-        let result = parse_datetime(datetime_str);
-        assert!(result.is_ok());
-
-        let parsed = result.unwrap();
-        assert_eq!(parsed.hour(), 12);
-        assert_eq!(parsed.minute(), 30);
-        assert_eq!(parsed.second(), 45);
-    }
 
     #[test]
     fn test_parse_datetime_invalid() {

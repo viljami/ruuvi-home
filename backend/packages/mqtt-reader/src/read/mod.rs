@@ -18,7 +18,7 @@ pub mod ruuvi_gateway_message;
 
 /// # Errors
 /// This function can fail if the MQTT client fails to connect or subscribe to
-/// the topic, or if `InfluxDB` connection fails.
+/// the topic, or if `TimescaleDB` connection fails.
 pub async fn create(
     config: Config,
 ) -> Result<impl Stream<Item = DecodedMessage>, Box<dyn std::error::Error>> {

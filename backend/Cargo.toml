@@ -1,7 +1,6 @@
 [workspace]
 members = [
   "packages/api",
-  "packages/influxdb-ruuvi-event",
   "packages/mqtt-reader",
   "packages/ruuvi-decoder",
   "packages/postgres-store",

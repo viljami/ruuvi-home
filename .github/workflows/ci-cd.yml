@@ -199,7 +199,6 @@ jobs:
         env:
           PI_HOST: ${{ secrets.PI_HOST }}
           PI_USER: ${{ secrets.PI_USER }}
-          INFLUXDB_TOKEN: ${{ secrets.INFLUXDB_TOKEN }}
           GATEWAY_MAC: ${{ secrets.GATEWAY_MAC }}
         run: |
           # Create deployment script
@@ -218,7 +217,6 @@ jobs:
           fi
 
           # Update sensitive environment variables from GitHub secrets
-          sed -i "s/INFLUXDB_TOKEN=.*/INFLUXDB_TOKEN=${INFLUXDB_TOKEN}/" .env
           sed -i "s/GATEWAY_MAC=.*/GATEWAY_MAC=${GATEWAY_MAC}/" .env
 
           # Pull latest images and restart services

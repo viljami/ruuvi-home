@@ -155,11 +155,14 @@ impl Df5Decoder {
     }
 
     // fn get_rssi(&self, rssi_byte: &str) -> i8 {
-    //     let rssi = u16::from_str_radix(rssi_byte, 16).unwrap();
-    //     if rssi > 127 {
-    //         -((255 - rssi as u8) as i8)
+    //     if let Some(rssi) = u16::from_str_radix(rssi_byte, 16).ok() {
+    //         if rssi > 127 {
+    //             -((255 - rssi as u8) as i8)
+    //         } else {
+    //             rssi as i8
+    //         }
     //     } else {
-    //         rssi as i8
+    //         0
     //     }
     // }
 }
@@ -241,18 +244,20 @@ mod test {
         rssi: None
     })]
     fn test_df5_decoder(#[case] encoded: Filename, #[case] expected: SensorData5) {
+        #[allow(clippy::expect_used)]
         let MqttPayload { data, .. } = serde_json::from_str(
+            #[allow(clippy::expect_used)]
             &fs::read_to_string(format!("tests/fixtures/{encoded}")).expect("File"),
         )
         .expect("MqttPayload");
         let splitted = data.split("FF9904").collect::<Vec<_>>();
-        let splitted = splitted.get(1).unwrap();
+        #[allow(clippy::expect_used)]
+        let splitted = splitted.get(1).expect("Split");
         println!("{data:?}: {}, {splitted:?}: {}", data.len(), splitted.len());
 
-        // let contents = fs::read_to_string(expected).expect("File");
         let decoder = Df5Decoder {};
-        // let data = "051e0000f0ff";
-        let result = decoder.decode_data(splitted).unwrap();
+        #[allow(clippy::expect_used)]
+        let result = decoder.decode_data(splitted).expect("Decode");
         assert_eq!(result, SensorData::Df5(expected));
     }
 

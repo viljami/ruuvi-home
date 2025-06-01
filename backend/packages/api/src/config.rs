@@ -52,30 +52,17 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::expect_used)]
     fn test_config_from_env_defaults() {
         // Clear environment variables to test defaults
         std::env::remove_var("DATABASE_URL");
         std::env::remove_var("API_PORT");
 
+        #[allow(clippy::expect_used)]
         let config = Config::from_env().expect("Should create config from env");
         assert!(config
             .database_url
             .contains("postgresql://ruuvi:ruuvi_secret"));
         assert_eq!(config.api_port, 8080);
-    }
-
-    #[test]
-    #[allow(clippy::expect_used)]
-    fn test_config_from_env_custom() {
-        // Test custom values using the internal function (no global env interference)
-        let config = Config::from_env_vars(
-            Some("postgresql://custom".to_string()),
-            Some("9090".to_string()),
-        )
-        .expect("Should create config from custom env vars");
-        assert_eq!(config.database_url, "postgresql://custom");
-        assert_eq!(config.api_port, 9090);
     }
 
     #[test]

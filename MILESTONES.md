@@ -11,7 +11,7 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 - [x] Create docker-compose.yaml with all required services
 - [x] Implement MQTT simulator to generate mock Ruuvi data
 - [x] Configure Mosquitto MQTT broker
-- [x] Set up InfluxDB container
+- [x] Set up TimescaleDB container
 - [x] Create development documentation
 - [x] Implement comprehensive tests for MQTT simulator
 - [x] Create test runner scripts and Docker test setup
@@ -22,7 +22,6 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 
 - Can start all services with a single command
 - Simulated MQTT messages visible in Mosquitto logs
-- InfluxDB UI accessible and ready for data
 - Tests verify correctness of simulated data
 - Simulator produces messages in the exact format used by real Ruuvi Gateways
 
@@ -32,7 +31,7 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 
 - [*] Implement minimal MQTT client that connects to broker
 - [*] Create basic Ruuvi data decoder for essential metrics
-- [*] Implement InfluxDB writer for time-series storage
+- [*] Implement TimeseriesDB writer for time-series storage
 - [*] Add logging and error handling
 - [*] Write unit tests for MQTT decoding
 - [*] Write unit tests for MQTT subscription
@@ -41,7 +40,7 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 
 - MQTT client successfully connects to broker
 - Ruuvi data formats correctly decoded
-- Data successfully stored in InfluxDB
+- Data successfully stored in TimeseriesDB
 
 ### Milestone 1.3: API Slice
 
@@ -63,6 +62,7 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 - ✅ Basic error cases handled appropriately
 
 **Testing**:
+
 - Integration test suite: `tests/api_integration_test.py`
 - Quick validation: `scripts/test-api.sh`
 - Full test runner: `tests/run_tests.sh`
@@ -89,6 +89,7 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 - ✅ Properly handles loading and error states
 
 **Additional Features Implemented**:
+
 - Real-time dashboard with auto-refresh every 30 seconds
 - Detailed sensor view with historical charts
 - Responsive design for mobile and desktop

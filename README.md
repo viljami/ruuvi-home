@@ -23,7 +23,7 @@ Originally implemented in Python, this project has been ported to Rust for impro
 - Ruuvi Gateway configured to send data to MQTT
 - Ruuvi Tags placed around your home
 - Mosquitto MQTT broker
-- InfluxDB (for time-series data storage)
+- TimescaleDB (for time-series data storage)
 
 ## Development
 
@@ -32,11 +32,13 @@ Originally implemented in Python, this project has been ported to Rust for impro
 This project includes comprehensive code validation to ensure all changes meet quality standards. AI contributors must validate all code before submission.
 
 **Quick Validation:**
+
 ```bash
 ./scripts/ai-validate.sh
 ```
 
 **Language-Specific Validation:**
+
 ```bash
 ./scripts/ai-validate.sh --rust       # Rust code
 ./scripts/ai-validate.sh --typescript # TypeScript/React
@@ -44,10 +46,12 @@ This project includes comprehensive code validation to ensure all changes meet q
 ```
 
 **Documentation:**
+
 - [AI Coding Guidelines](AI_CODING_GUIDELINES.md) - Complete development rules
 - [AI Validation Guide](docs/AI_VALIDATION_GUIDE.md) - Step-by-step validation instructions
 
 All code must pass validation checks including:
+
 - Syntax validation
 - Linting (zero warnings)
 - Code formatting
@@ -86,12 +90,14 @@ ruuvi-home/
 ## Installation
 
 1. Clone this repository to your computer:
+
    ```
    git clone https://github.com/yourusername/ruuvi-home.git
    cd ruuvi-home
    ```
 
 2. For local development, use Docker Compose:
+
    ```
    docker-compose up
    ```
@@ -107,7 +113,7 @@ Configuration files are located in the `backend/config` directory. You'll need t
 
 - MQTT broker connection details
 - Ruuvi Gateway information
-- InfluxDB connection settings
+- TimescaleDB connection settings
 - Sensor location mapping (which sensor is in which room)
 - Data retention policies
 
@@ -115,7 +121,7 @@ Configuration files are located in the `backend/config` directory. You'll need t
 
 - **Rust** - Backend services
 - **MQTT** - Communication protocol for IoT devices
-- **InfluxDB** - Time-series database for sensor data
+- **TimescaleDB** - Time-series database for sensor data
 - **Cap'n Proto** - Efficient serialization format
 - **Tokio** - Asynchronous runtime for Rust
 - **React/TypeScript** - Frontend web interface
