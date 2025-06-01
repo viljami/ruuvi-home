@@ -10,6 +10,9 @@ COMPOSE_FILE="$PROJECT_ROOT/docker-compose.production.yaml"
 ENV_FILE="$PROJECT_ROOT/.env"
 ENV_PRODUCTION_TEMPLATE="$PROJECT_ROOT/.env.production"
 
+# Source docker compatibility library
+source "$SCRIPT_DIR/setup-pi/lib/docker-compat.sh"
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -77,24 +80,20 @@ validate_environment() {
     log_success "Environment file validation passed"
 }
 
-# Function to check Docker and Docker Compose
+# Function to check Docker and Docker Compose using compatibility library
 check_docker() {
-    if ! command -v docker &> /dev/null; then
-        log_error "Docker is not installed"
-        exit 1
-    fi
+    log_info "Checking Docker environment using compatibility detection"
 
-    if ! docker info &> /dev/null; then
-        log_error "Docker daemon is not running or user lacks permissions"
-        exit 1
-    fi
-
-    if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-        log_error "Docker Compose is not available"
+    # Initialize docker compatibility detection
+    if ! init_docker_compat; then
+        log_error "Docker environment validation failed"
+        log_info "Docker environment summary:"
+        get_docker_summary
         exit 1
     fi
 
     log_success "Docker environment check passed"
+    log_info "Using Docker Compose command: ${COMPOSE_COMMAND}"
 }
 
 # Function to verify production compose file exists and doesn't contain mqtt-simulator
@@ -111,7 +110,14 @@ verify_production_config() {
         exit 1
     fi
 
-    log_success "Production configuration verified (mqtt-simulator excluded)"
+    # Validate compose file syntax using docker-compat library
+    log_info "Validating Docker Compose file syntax..."
+    if ! test_docker_compose_file "$COMPOSE_FILE"; then
+        log_error "Docker Compose file validation failed"
+        exit 1
+    fi
+
+    log_success "Production configuration verified (mqtt-simulator excluded, syntax valid)"
 }
 
 # Function to stop any existing services
@@ -120,11 +126,11 @@ stop_existing_services() {
 
     # Try both development and production compose files
     if [[ -f "$PROJECT_ROOT/docker-compose.yaml" ]]; then
-        docker-compose -f "$PROJECT_ROOT/docker-compose.yaml" down --remove-orphans || true
+        compose_exec "down" "$PROJECT_ROOT/docker-compose.yaml" "--remove-orphans" || true
     fi
 
     if [[ -f "$COMPOSE_FILE" ]]; then
-        docker-compose -f "$COMPOSE_FILE" down --remove-orphans || true
+        compose_exec "down" "$COMPOSE_FILE" "--remove-orphans" || true
     fi
 
     log_success "Existing services stopped"
@@ -134,7 +140,10 @@ stop_existing_services() {
 pull_images() {
     log_info "Pulling latest Docker images..."
     cd "$PROJECT_ROOT"
-    docker-compose -f "$COMPOSE_FILE" pull
+    if ! compose_exec "pull" "$COMPOSE_FILE"; then
+        log_error "Failed to pull Docker images"
+        exit 1
+    fi
     log_success "Images pulled successfully"
 }
 
@@ -144,10 +153,16 @@ deploy_services() {
     cd "$PROJECT_ROOT"
 
     # Build images
-    docker-compose -f "$COMPOSE_FILE" build
+    if ! compose_exec "build" "$COMPOSE_FILE"; then
+        log_error "Failed to build Docker images"
+        exit 1
+    fi
 
     # Start services
-    docker-compose -f "$COMPOSE_FILE" up -d
+    if ! compose_exec "up" "$COMPOSE_FILE" "-d"; then
+        log_error "Failed to start services"
+        exit 1
+    fi
 
     log_success "Production services started"
 }
@@ -161,13 +176,13 @@ verify_deployment() {
     sleep 10
 
     # Check service status
-    docker-compose -f "$COMPOSE_FILE" ps
+    compose_exec "ps" "$COMPOSE_FILE" || true
 
     # Verify no mqtt-simulator is running
     if docker ps --format "table {{.Names}}" | grep -q "mqtt-simulator"; then
         log_error "CRITICAL: mqtt-simulator container is running in production!"
         log_error "Stopping deployment..."
-        docker-compose -f "$COMPOSE_FILE" down
+        compose_exec "down" "$COMPOSE_FILE"
         exit 1
     fi
 
@@ -198,17 +213,34 @@ verify_deployment() {
 show_status() {
     log_info "=== Deployment Status ==="
     cd "$PROJECT_ROOT"
-    docker-compose -f "$COMPOSE_FILE" ps
+    compose_exec "ps" "$COMPOSE_FILE" || true
 
     echo ""
     log_info "=== Service URLs ==="
-    echo "Frontend: http://localhost:3000"
-    echo "API: http://localhost:8080"
-    echo "API Health: http://localhost:8080/health"
+    echo "Frontend: http://localhost:${FRONTEND_PORT:-3000}"
+    echo "API: http://localhost:${API_PORT:-8080}"
+    echo "API Health: http://localhost:${API_PORT:-8080}/health"
+
+    echo ""
+    log_info "=== Port Configuration ==="
+    echo "MQTT Broker: ${MOSQUITTO_PORT:-1883}"
+    echo "MQTT WebSocket: ${MOSQUITTO_WS_PORT:-9001}"
+    echo "API Server: ${API_PORT:-8080}"
+    echo "Frontend: ${FRONTEND_PORT:-3000}"
+    echo "Webhook (systemd): ${WEBHOOK_PORT:-9000}"
+    echo "Database: Internal only (not exposed for security)"
+
+    echo ""
+    log_info "=== Network Access ==="
+    echo "External access required for:"
+    echo "- Frontend: Port ${FRONTEND_PORT:-3000} (Web UI)"
+    echo "- API: Port ${API_PORT:-8080} (REST API)"
+    echo "- MQTT: Port ${MOSQUITTO_PORT:-1883} (Ruuvi Gateway)"
+    echo "- Webhook: Port ${WEBHOOK_PORT:-9000} (GitHub webhooks)"
 
     echo ""
     log_info "=== Logs ==="
-    echo "View logs with: docker-compose -f $COMPOSE_FILE logs -f [service_name]"
+    echo "View logs with: $COMPOSE_COMMAND -f $COMPOSE_FILE logs -f [service_name]"
     echo "Available services: mosquitto, timescaledb, mqtt-reader, api-server, frontend"
 }
 

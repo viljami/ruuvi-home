@@ -172,6 +172,26 @@ impl PostgresStore {
         Ok(events)
     }
 
+    /// Get all unique sensor MAC addresses
+    pub async fn get_sensors(&self) -> Result<Vec<String>> {
+        let rows = sqlx::query(
+            r"
+            SELECT DISTINCT sensor_mac
+            FROM sensor_data
+            ORDER BY sensor_mac
+            ",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+
+        let mut sensors = Vec::new();
+        for row in rows {
+            sensors.push(row.get("sensor_mac"));
+        }
+
+        Ok(sensors)
+    }
+
     pub async fn get_latest_reading(&self, sensor_mac: &str) -> Result<Option<Event>> {
         let row = sqlx::query(
             r"

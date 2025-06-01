@@ -4,8 +4,8 @@ services:
     image: eclipse-mosquitto:2.0
     container_name: ruuvi-mosquitto
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "${MOSQUITTO_PORT:-1883}:1883"
+      - "${MOSQUITTO_WS_PORT:-9001}:9001"
     volumes:
       - ./docker/mosquitto/config:/mosquitto/config
       - mosquitto-data:/mosquitto/data
@@ -105,7 +105,7 @@ services:
       api-server:
         condition: service_healthy
     environment:
-      - REACT_APP_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - REACT_APP_API_URL=${PUBLIC_API_URL:-http://localhost:${API_PORT:-8080}}
       - NODE_ENV=production
     restart: unless-stopped
     healthcheck:

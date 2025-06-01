@@ -108,7 +108,7 @@ def create_ruuvi_data_hex(
     # Pack data using the exact format expected by ruuvitag-sensor decoder
     # Format: ">BhHHhhhHBH6B"
     data = struct.pack(
-        ">BhHHhhhHBH6s",
+        ">BhHHhhhHBH6B",
         data_format,
         temp_raw,
         humidity_raw,
@@ -119,7 +119,12 @@ def create_ruuvi_data_hex(
         power_info,
         movement_counter,
         sequence_number,
-        mac_bytes,
+        mac_bytes[0],
+        mac_bytes[1],
+        mac_bytes[2],
+        mac_bytes[3],
+        mac_bytes[4],
+        mac_bytes[5],
     )
 
     return data.hex().upper()

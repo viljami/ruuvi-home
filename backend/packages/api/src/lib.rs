@@ -8,6 +8,7 @@
 #![cfg_attr(not(test), deny(clippy::panic))]
 
 pub mod config;
+pub mod errors;
 pub mod handlers;
 pub mod queries;
 pub mod state;
@@ -21,6 +22,7 @@ use axum::{
     Router,
 };
 pub use config::Config;
+pub use errors::*;
 pub use handlers::*;
 pub use queries::*;
 pub use state::AppState;

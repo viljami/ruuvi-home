@@ -110,16 +110,16 @@ export DEPLOYMENT_MODE=registry
 export ENABLE_HTTPS=true
 export ENABLE_LETS_ENCRYPT=true
 export WEBHOOK_DOMAIN=webhook.yourdomain.com
-export WEBHOOK_EMAIL=admin@yourdomain.com
+export WEBHOOK_EMAIL=admin@host.local
 export LETS_ENCRYPT_STAGING=false  # Use 'true' for testing
 sudo ./scripts/setup-pi/setup-pi.sh
 ```
 
 ### GitHub Webhook Configuration with HTTPS
 
-#### For Self-Signed Certificates:
+#### For Self-Signed Certificates (Recommended):
 1. **GitHub Repository → Settings → Webhooks → Add webhook**
-2. **Configuration:**
+
    - Payload URL: `https://YOUR_PI_IP:9000`
    - Content type: `application/json`
    - Secret: [from `/home/pi/ruuvi-home/.env`]

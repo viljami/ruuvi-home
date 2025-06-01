@@ -6,7 +6,6 @@ use axum::{
         Query,
         State,
     },
-    http::StatusCode,
     response::Json,
 };
 use chrono::{
@@ -19,9 +18,12 @@ use postgres_store::{
     StorageStats,
     TimeBucketedData,
 };
-use tracing::error;
 
 use crate::{
+    errors::{
+        ApiError,
+        ApiResult,
+    },
     queries::{
         HistoricalQuery,
         StorageEstimateQuery,
@@ -46,16 +48,16 @@ pub async fn health_check() -> &'static str {
 ///
 /// # Errors
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` if database query fails
-pub async fn get_sensors(State(state): State<AppState>) -> Result<Json<Vec<Event>>, StatusCode> {
-    match state.store.get_active_sensors().await {
+pub async fn get_sensors(State(state): State<AppState>) -> ApiResult<Json<Vec<String>>> {
+    match state.store.get_sensors().await {
         Ok(sensors) => {
-            tracing::info!("Retrieved {} active sensors", sensors.len());
+            tracing::debug!("Retrieved {} sensors", sensors.len());
             Ok(Json(sensors))
         }
-        Err(error) => {
-            error!("Failed to get active sensors: {}", error);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get sensors list",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -68,14 +70,10 @@ pub async fn get_sensors(State(state): State<AppState>) -> Result<Json<Vec<Event
 pub async fn get_sensor_latest(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
-) -> Result<Json<Event>, StatusCode> {
+) -> ApiResult<Json<Event>> {
     // Validate MAC format
     if !is_valid_mac_format(&sensor_mac) {
-        error!(
-            "Invalid MAC address format: {}",
-            sanitize_mac_for_logging(&sensor_mac)
-        );
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_mac(&sensor_mac));
     }
 
     match state.store.get_latest_reading(&sensor_mac).await {
@@ -91,16 +89,12 @@ pub async fn get_sensor_latest(
                 "No reading found for sensor: {}",
                 sanitize_mac_for_logging(&sensor_mac)
             );
-            Err(StatusCode::NOT_FOUND)
+            Err(ApiError::readings_not_found(&sensor_mac))
         }
-        Err(error) => {
-            error!(
-                "Failed to get latest reading for sensor {}: {}",
-                sanitize_mac_for_logging(&sensor_mac),
-                error
-            );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get latest reading",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -115,21 +109,16 @@ pub async fn get_sensor_history(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
     Query(params): Query<HistoricalQuery>,
-) -> Result<Json<Vec<Event>>, StatusCode> {
+) -> ApiResult<Json<Vec<Event>>> {
     // Validate MAC format
     if !is_valid_mac_format(&sensor_mac) {
-        error!(
-            "Invalid MAC address format: {}",
-            sanitize_mac_for_logging(&sensor_mac)
-        );
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_mac(&sensor_mac));
     }
 
     // Validate limit if provided
     if let Some(limit) = params.limit {
         if !validate_limit(limit) {
-            error!("Invalid limit value: {}", limit);
-            return Err(StatusCode::BAD_REQUEST);
+            return Err(ApiError::invalid_limit(limit));
         }
     }
 
@@ -138,8 +127,7 @@ pub async fn get_sensor_history(
             if let Ok(dt) = parse_datetime(date_str) {
                 Some(dt)
             } else {
-                error!("Invalid start date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         #[allow(clippy::arithmetic_side_effects)]
@@ -151,8 +139,7 @@ pub async fn get_sensor_history(
             if let Ok(dt) = parse_datetime(date_str) {
                 Some(dt)
             } else {
-                error!("Invalid end date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         None => Some(Utc::now()),
@@ -161,8 +148,9 @@ pub async fn get_sensor_history(
     // Validate date range
     if let (Some(start_dt), Some(end_dt)) = (start, end) {
         if start_dt >= end_dt {
-            error!("Start date must be before end date");
-            return Err(StatusCode::BAD_REQUEST);
+            return Err(ApiError::invalid_date_range(
+                "Start date must be before end date",
+            ));
         }
     }
 
@@ -179,14 +167,10 @@ pub async fn get_sensor_history(
             );
             Ok(Json(readings))
         }
-        Err(error) => {
-            error!(
-                "Failed to get historical data for sensor {}: {}",
-                sanitize_mac_for_logging(&sensor_mac),
-                error
-            );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get historical data",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -201,14 +185,10 @@ pub async fn get_sensor_aggregates(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
     Query(params): Query<TimeBucketQuery>,
-) -> Result<Json<Vec<TimeBucketedData>>, StatusCode> {
+) -> ApiResult<Json<Vec<TimeBucketedData>>> {
     // Validate MAC format
     if !is_valid_mac_format(&sensor_mac) {
-        error!(
-            "Invalid MAC address format: {}",
-            sanitize_mac_for_logging(&sensor_mac)
-        );
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_mac(&sensor_mac));
     }
 
     let start = match params.start.as_ref() {
@@ -216,8 +196,7 @@ pub async fn get_sensor_aggregates(
             if let Ok(dt) = parse_datetime(date_str) {
                 dt
             } else {
-                error!("Invalid start date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         #[allow(clippy::arithmetic_side_effects)]
@@ -229,8 +208,7 @@ pub async fn get_sensor_aggregates(
             if let Ok(dt) = parse_datetime(date_str) {
                 dt
             } else {
-                error!("Invalid end date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         None => Utc::now(),
@@ -238,8 +216,9 @@ pub async fn get_sensor_aggregates(
 
     // Validate date range
     if start >= end {
-        error!("Start date must be before end date");
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_date_range(
+            "Start date must be before end date",
+        ));
     }
 
     let interval = match params.interval.as_deref() {
@@ -247,8 +226,11 @@ pub async fn get_sensor_aggregates(
             if let Some(interval) = parse_interval(interval_str) {
                 interval
             } else {
-                error!("Unsupported interval: {}", interval_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::InvalidParameter {
+                    parameter: "interval".to_string(),
+                    value: interval_str.to_string(),
+                    expected: "one of: 1m, 5m, 15m, 30m, 1h, 6h, 12h, 1d".to_string(),
+                });
             }
         }
         None => postgres_store::TimeInterval::Hours(1),
@@ -267,14 +249,10 @@ pub async fn get_sensor_aggregates(
             );
             Ok(Json(data))
         }
-        Err(error) => {
-            error!(
-                "Failed to get aggregated data for sensor {}: {}",
-                sanitize_mac_for_logging(&sensor_mac),
-                error
-            );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get aggregated data",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -289,14 +267,10 @@ pub async fn get_sensor_hourly_aggregates(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
     Query(params): Query<TimeBucketQuery>,
-) -> Result<Json<Vec<TimeBucketedData>>, StatusCode> {
+) -> ApiResult<Json<Vec<TimeBucketedData>>> {
     // Validate MAC format
     if !is_valid_mac_format(&sensor_mac) {
-        error!(
-            "Invalid MAC address format: {}",
-            sanitize_mac_for_logging(&sensor_mac)
-        );
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_mac(&sensor_mac));
     }
 
     let start = match params.start.as_ref() {
@@ -304,8 +278,7 @@ pub async fn get_sensor_hourly_aggregates(
             if let Ok(dt) = parse_datetime(date_str) {
                 dt
             } else {
-                error!("Invalid start date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         #[allow(clippy::arithmetic_side_effects)]
@@ -317,8 +290,7 @@ pub async fn get_sensor_hourly_aggregates(
             if let Ok(dt) = parse_datetime(date_str) {
                 dt
             } else {
-                error!("Invalid end date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         None => Utc::now(),
@@ -326,8 +298,9 @@ pub async fn get_sensor_hourly_aggregates(
 
     // Validate date range
     if start >= end {
-        error!("Start date must be before end date");
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_date_range(
+            "Start date must be before end date",
+        ));
     }
 
     match state
@@ -343,14 +316,10 @@ pub async fn get_sensor_hourly_aggregates(
             );
             Ok(Json(data))
         }
-        Err(error) => {
-            error!(
-                "Failed to get hourly aggregates for sensor {}: {}",
-                sanitize_mac_for_logging(&sensor_mac),
-                error
-            );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get hourly aggregated data",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -365,14 +334,10 @@ pub async fn get_sensor_daily_aggregates(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
     Query(params): Query<TimeBucketQuery>,
-) -> Result<Json<Vec<TimeBucketedData>>, StatusCode> {
+) -> ApiResult<Json<Vec<TimeBucketedData>>> {
     // Validate MAC format
     if !is_valid_mac_format(&sensor_mac) {
-        error!(
-            "Invalid MAC address format: {}",
-            sanitize_mac_for_logging(&sensor_mac)
-        );
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_mac(&sensor_mac));
     }
 
     let start = match params.start.as_ref() {
@@ -380,8 +345,7 @@ pub async fn get_sensor_daily_aggregates(
             if let Ok(dt) = parse_datetime(date_str) {
                 dt
             } else {
-                error!("Invalid start date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         #[allow(clippy::arithmetic_side_effects)]
@@ -393,8 +357,7 @@ pub async fn get_sensor_daily_aggregates(
             if let Ok(dt) = parse_datetime(date_str) {
                 dt
             } else {
-                error!("Invalid end date format: {}", date_str);
-                return Err(StatusCode::BAD_REQUEST);
+                return Err(ApiError::invalid_date(date_str));
             }
         }
         None => Utc::now(),
@@ -402,8 +365,9 @@ pub async fn get_sensor_daily_aggregates(
 
     // Validate date range
     if start >= end {
-        error!("Start date must be before end date");
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::invalid_date_range(
+            "Start date must be before end date",
+        ));
     }
 
     match state
@@ -419,14 +383,10 @@ pub async fn get_sensor_daily_aggregates(
             );
             Ok(Json(data))
         }
-        Err(error) => {
-            error!(
-                "Failed to get daily aggregates for sensor {}: {}",
-                sanitize_mac_for_logging(&sensor_mac),
-                error
-            );
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get daily aggregated data",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -434,18 +394,16 @@ pub async fn get_sensor_daily_aggregates(
 ///
 /// # Errors
 /// Returns `StatusCode::INTERNAL_SERVER_ERROR` if database query fails
-pub async fn get_storage_stats(
-    State(state): State<AppState>,
-) -> Result<Json<StorageStats>, StatusCode> {
+pub async fn get_storage_stats(State(state): State<AppState>) -> ApiResult<Json<StorageStats>> {
     match state.store.get_storage_stats().await {
         Ok(storage_stats) => {
             tracing::debug!("Retrieved storage statistics");
             Ok(Json(storage_stats))
         }
-        Err(error) => {
-            error!("Failed to get storage stats: {}", error);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "get storage statistics",
+            &error.to_string(),
+        )),
     }
 }
 
@@ -459,44 +417,59 @@ pub async fn get_storage_stats(
 pub async fn get_storage_estimate(
     State(state): State<AppState>,
     Query(params): Query<StorageEstimateQuery>,
-) -> Result<Json<StorageEstimate>, StatusCode> {
+) -> ApiResult<Json<StorageEstimate>> {
     let sensor_count = params.sensor_count.unwrap_or(10);
     let interval_seconds = params.interval_seconds.unwrap_or(10);
     let retention_years = params.retention_years.unwrap_or(5);
 
     // Validate parameters
     if sensor_count <= 0 {
-        error!("Sensor count must be positive, got: {}", sensor_count);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::InvalidParameter {
+            parameter: "sensor_count".to_string(),
+            value: sensor_count.to_string(),
+            expected: "positive integer".to_string(),
+        });
     }
 
     if interval_seconds <= 0 {
-        error!(
-            "Interval seconds must be positive, got: {}",
-            interval_seconds
-        );
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::InvalidParameter {
+            parameter: "interval_seconds".to_string(),
+            value: interval_seconds.to_string(),
+            expected: "positive integer".to_string(),
+        });
     }
 
     if retention_years <= 0 {
-        error!("Retention years must be positive, got: {}", retention_years);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::InvalidParameter {
+            parameter: "retention_years".to_string(),
+            value: retention_years.to_string(),
+            expected: "positive integer".to_string(),
+        });
     }
 
     // Reasonable upper bounds
     if sensor_count > 10000 {
-        error!("Sensor count too high: {}", sensor_count);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::InvalidParameter {
+            parameter: "sensor_count".to_string(),
+            value: sensor_count.to_string(),
+            expected: "integer between 1 and 10000".to_string(),
+        });
     }
 
     if !(1..=86400).contains(&interval_seconds) {
-        error!("Interval seconds out of range: {}", interval_seconds);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::InvalidParameter {
+            parameter: "interval_seconds".to_string(),
+            value: interval_seconds.to_string(),
+            expected: "integer between 1 and 86400 (1 day)".to_string(),
+        });
     }
 
     if retention_years > 100 {
-        error!("Retention years too high: {}", retention_years);
-        return Err(StatusCode::BAD_REQUEST);
+        return Err(ApiError::InvalidParameter {
+            parameter: "retention_years".to_string(),
+            value: retention_years.to_string(),
+            expected: "integer between 1 and 100".to_string(),
+        });
     }
 
     match state
@@ -513,10 +486,10 @@ pub async fn get_storage_estimate(
             );
             Ok(Json(estimate))
         }
-        Err(error) => {
-            error!("Failed to get storage estimate: {}", error);
-            Err(StatusCode::INTERNAL_SERVER_ERROR)
-        }
+        Err(error) => Err(ApiError::database_error(
+            "calculate storage estimate",
+            &error.to_string(),
+        )),
     }
 }
 

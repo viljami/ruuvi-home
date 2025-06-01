@@ -88,11 +88,15 @@ configure_https_settings() {
 
     log_section "HTTPS Configuration"
 
-    echo -e "${COLOR_YELLOW}HTTPS Configuration for Local Pi:${COLOR_NC}"
-    echo "1) IP-based certificate (default) - Works with Pi's IP address"
-    echo "2) Let's Encrypt certificate - Requires public domain name"
+    echo -e "${COLOR_YELLOW}HTTPS Configuration:${COLOR_NC}"
     echo ""
-    echo "For local Pi deployment, option 1 is recommended."
+    echo "HTTPS provides secure encrypted communication with GitHub webhooks."
+    echo "Choose your preferred HTTPS method:"
+    echo ""
+    echo "1) Self-signed certificate (recommended) - Works with Pi's IP address"
+    echo "2) Let's Encrypt certificate - Requires public domain name"
+    echo "3) Skip HTTPS - Use HTTP only (not recommended)"
+    echo ""
     echo "Your Pi's IP: $(hostname -I | awk '{print $1}')"
     echo ""
 
@@ -109,19 +113,18 @@ configure_https_settings() {
         # Check if domain is actually an IP address
         if [[ "$WEBHOOK_DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             log_error "$context" "Let's Encrypt cannot issue certificates for IP addresses"
-            log_error "$context" "Use a real domain name or choose option 1 for IP-based certificates"
+            log_error "$context" "Use a real domain name or choose option 2 for self-signed certificates"
             return 1
         fi
 
         if [ -z "$WEBHOOK_EMAIL" ]; then
-            log_error "$context" "Let's Encrypt requires WEBHOOK_EMAIL environment variable"
-            log_error "$context" "Example: export WEBHOOK_EMAIL=admin@yourdomain.com"
-            return 1
+            export WEBHOOK_EMAIL="admin@ruuvi.local"
+            log_info "$context" "Using default email: $WEBHOOK_EMAIL"
         fi
     else
         if [ -z "$ENABLE_LETS_ENCRYPT" ]; then
             while true; do
-                read -p "Choose HTTPS method (1 or 2): " choice
+                read -p "Choose option (1, 2, or 3): " choice
                 case $choice in
                     1)
                         export ENABLE_LETS_ENCRYPT="false"
@@ -135,13 +138,18 @@ configure_https_settings() {
                         echo "This will NOT work with just an IP address."
                         echo ""
                         read -p "Enter your public domain name (e.g., webhook.yourdomain.com): " domain_input
-                        read -p "Enter your email address: " email_input
+                        read -p "Enter your email address (or press Enter for default): " email_input
                         export WEBHOOK_DOMAIN="$domain_input"
-                        export WEBHOOK_EMAIL="$email_input"
+                        export WEBHOOK_EMAIL="${email_input:-admin@ruuvi.local}"
                         break
                         ;;
+                    3)
+                        export WEBHOOK_ENABLE_HTTPS="false"
+                        log_info "$context" "HTTPS disabled - using HTTP only"
+                        return 0
+                        ;;
                     *)
-                        echo "Invalid choice. Please enter 1 or 2."
+                        echo "Invalid choice. Please enter 1, 2, or 3."
                         ;;
                 esac
             done
@@ -153,10 +161,12 @@ configure_https_settings() {
         log_info "$context" "Selected: Let's Encrypt SSL certificate"
         log_info "$context" "Domain: $WEBHOOK_DOMAIN"
         log_info "$context" "Email: $WEBHOOK_EMAIL"
+        export WEBHOOK_ENABLE_HTTPS="true"
     else
-        log_info "$context" "Selected: IP-based SSL certificate"
+        log_info "$context" "Selected: Self-signed SSL certificate"
         log_info "$context" "Certificate will be valid for IP: $WEBHOOK_DOMAIN"
         log_info "$context" "GitHub webhook will need SSL verification disabled"
+        export WEBHOOK_ENABLE_HTTPS="true"
     fi
 
     export WEBHOOK_ENABLE_HTTPS="true"

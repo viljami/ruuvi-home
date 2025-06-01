@@ -275,3 +275,37 @@ This document outlines our implementation roadmap for the Ruuvi Home project, fo
 - New developers can set up environment easily
 - Configuration changes don't require code edits
 - Installation process documented and automated
+
+### Milestone 4.3: Allow uploading electricity consumtion data via the UI and save to database with api_integration_test
+
+- [ ] Implement UI for uploading CSV files
+- [ ] Save uploaded data to database
+- [ ] Write integration tests for API endpoints
+- [ ] provide electricity consumption data via api
+- [ ] Display the uploaded data on the same graph as temperatures
+
+**Acceptance Criteria**:
+
+- Users can upload CSV files through the UI
+- Uploaded data is saved to the database
+- Integration tests cover API endpoints for uploading data
+
+### Milestone 4.4: Add user management
+
+- [ ] Implement user registration and login
+- [ ] Secure user data with encryption
+- [ ] Implement role-based access control (read only vs admin)
+- [ ] Provide user management API endpoints
+- [ ] Implement user roles and permissions
+- [ ] secure all other endpoints exect /healthz
+- [ ] all registerations must be confirmed by email and admin to accept
+- [ ] older than 2 days unconfirmed by admin registerations must be deleted
+- [ ] reset password link sent to user email
+- [ ] send email notifications for important events
+
+**Acceptance Criteria**:
+
+- Users can register and log in securely
+- User data is encrypted at rest
+- Access to resources is controlled by roles
+- User management API endpoints are available
