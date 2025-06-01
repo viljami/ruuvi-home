@@ -29,7 +29,7 @@ generate_deploy_webhook_script() {
 #!/usr/bin/env python3
 """
 Ruuvi Home Deployment Webhook Server
-Handles GitHub webhook deployments
+Handles GitHub webhook deployments with HTTPS support
 """
 
 import os
@@ -38,13 +38,66 @@ import json
 import hmac
 import hashlib
 import subprocess
+import ssl
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from pathlib import Path
 
 # Configuration
 WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET', '${WEBHOOK_SECRET}')
 WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', '${WEBHOOK_PORT}'))
+WEBHOOK_ENABLE_HTTPS = os.getenv('WEBHOOK_ENABLE_HTTPS', 'true').lower() == 'true'
+WEBHOOK_CERT_PATH = os.getenv('WEBHOOK_CERT_PATH', '${PROJECT_DIR}/ssl/webhook.crt')
+WEBHOOK_KEY_PATH = os.getenv('WEBHOOK_KEY_PATH', '${PROJECT_DIR}/ssl/webhook.key')
 PROJECT_DIR = '${PROJECT_DIR}'
 LOG_FILE = '${LOG_DIR}/webhook.log'
+
+def log_webhook(message):
+    """Log webhook messages to file and console"""
+    timestamp = os.popen('date "+%Y-%m-%d %H:%M:%S"').read().strip()
+    log_entry = f"[{timestamp}] {message}"
+    print(log_entry)
+    try:
+        os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+        with open(LOG_FILE, 'a') as f:
+            f.write(log_entry + '\n')
+    except Exception as e:
+        print(f"Failed to write to log file: {e}")
+
+def ensure_ssl_certificates():
+    """Ensure SSL certificates exist, generate self-signed if needed"""
+    cert_path = Path(WEBHOOK_CERT_PATH)
+    key_path = Path(WEBHOOK_KEY_PATH)
+    
+    if not cert_path.exists() or not key_path.exists():
+        log_webhook("SSL certificates not found, generating self-signed certificates...")
+        
+        # Create SSL directory
+        ssl_dir = cert_path.parent
+        ssl_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Generate self-signed certificate
+        import subprocess
+        try:
+            subprocess.run([
+                'openssl', 'req', '-x509', '-newkey', 'rsa:4096', '-keyout', str(key_path),
+                '-out', str(cert_path), '-days', '365', '-nodes', '-subj',
+                '/C=FI/ST=Uusimaa/L=Helsinki/O=RuuviHome/OU=Webhook/CN=webhook.ruuvi.local'
+            ], check=True, capture_output=True)
+            log_webhook(f"Generated self-signed certificate: {cert_path}")
+            log_webhook(f"Generated private key: {key_path}")
+            
+            # Set proper permissions
+            os.chmod(str(key_path), 0o600)
+            os.chmod(str(cert_path), 0o644)
+            
+        except subprocess.CalledProcessError as e:
+            log_webhook(f"Failed to generate SSL certificates: {e}")
+            return False
+        except FileNotFoundError:
+            log_webhook("OpenSSL not found, please install: sudo apt install openssl")
+            return False
+    
+    return True
 
 class WebhookHandler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -52,31 +105,60 @@ class WebhookHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             payload = self.rfile.read(content_length)
             
+            log_webhook(f"Received webhook payload from {self.client_address[0]}")
+            
             # Verify signature
             signature = self.headers.get('X-Hub-Signature-256')
             if not self.verify_signature(payload, signature):
+                log_webhook("Webhook signature verification failed")
                 self.send_response(401)
                 self.end_headers()
+                self.wfile.write(b'Unauthorized')
                 return
             
             # Parse payload
             data = json.loads(payload.decode('utf-8'))
             
+            # Log the event
+            event_type = self.headers.get('X-GitHub-Event', 'unknown')
+            repository = data.get('repository', {}).get('full_name', 'unknown')
+            log_webhook(f"GitHub {event_type} event from {repository}")
+            
             # Handle push events to main branch
             if data.get('ref') == 'refs/heads/main':
+                log_webhook("Triggering deployment for main branch push")
                 self.deploy()
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(b'Deployment triggered')
+                self.wfile.write(b'Deployment triggered successfully')
             else:
+                ref = data.get('ref', 'unknown')
+                log_webhook(f"No action taken for ref: {ref}")
                 self.send_response(200)
                 self.end_headers()
-                self.wfile.write(b'No action taken')
+                self.wfile.write(b'No action taken - not main branch')
                 
+        except json.JSONDecodeError as e:
+            log_webhook(f"Invalid JSON payload: {e}")
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(b'Invalid JSON payload')
         except Exception as e:
-            print(f"Webhook error: {e}")
+            log_webhook(f"Webhook error: {e}")
             self.send_response(500)
             self.end_headers()
+            self.wfile.write(b'Internal server error')
+
+    def do_GET(self):
+        """Health check endpoint"""
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain')
+        self.end_headers()
+        self.wfile.write(b'Ruuvi Home Webhook Server - OK')
+
+    def log_message(self, format, *args):
+        """Override to use our logging function"""
+        log_webhook(f"{self.client_address[0]} - {format % args}")
     
     def verify_signature(self, payload, signature):
         if not signature or not WEBHOOK_SECRET:
@@ -92,16 +174,57 @@ class WebhookHandler(BaseHTTPRequestHandler):
     
     def deploy(self):
         try:
-            subprocess.run([
+            log_webhook("Starting deployment process...")
+            result = subprocess.run([
                 f'{PROJECT_DIR}/scripts/deploy.sh'
-            ], check=True, cwd=PROJECT_DIR)
+            ], check=True, cwd=PROJECT_DIR, capture_output=True, text=True)
+            log_webhook("Deployment completed successfully")
+            if result.stdout:
+                log_webhook(f"Deploy stdout: {result.stdout}")
         except subprocess.CalledProcessError as e:
-            print(f"Deployment failed: {e}")
+            error_msg = f"Deployment failed with exit code {e.returncode}"
+            if e.stderr:
+                error_msg += f": {e.stderr}"
+            log_webhook(error_msg)
+            raise
 
 if __name__ == '__main__':
-    server = HTTPServer(('0.0.0.0', WEBHOOK_PORT), WebhookHandler)
-    print(f"Webhook server starting on port {WEBHOOK_PORT}")
-    server.serve_forever()
+    try:
+        # Setup SSL if enabled
+        if WEBHOOK_ENABLE_HTTPS:
+            log_webhook("HTTPS mode enabled")
+            if not ensure_ssl_certificates():
+                log_webhook("SSL setup failed, falling back to HTTP")
+                WEBHOOK_ENABLE_HTTPS = False
+        
+        # Create server
+        server = HTTPServer(('0.0.0.0', WEBHOOK_PORT), WebhookHandler)
+        
+        if WEBHOOK_ENABLE_HTTPS:
+            # Configure SSL context
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(WEBHOOK_CERT_PATH, WEBHOOK_KEY_PATH)
+            
+            # Security settings
+            context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
+            context.minimum_version = ssl.TLSVersion.TLSv1_2
+            
+            server.socket = context.wrap_socket(server.socket, server_side=True)
+            protocol = "HTTPS"
+        else:
+            protocol = "HTTP"
+        
+        log_webhook(f"Webhook server starting on {protocol}://0.0.0.0:{WEBHOOK_PORT}")
+        log_webhook(f"Certificate path: {WEBHOOK_CERT_PATH if WEBHOOK_ENABLE_HTTPS else 'N/A'}")
+        log_webhook(f"Log file: {LOG_FILE}")
+        
+        server.serve_forever()
+        
+    except KeyboardInterrupt:
+        log_webhook("Webhook server stopped by user")
+    except Exception as e:
+        log_webhook(f"Webhook server error: {e}")
+        sys.exit(1)
 EOF
     
     chmod +x "$script_path"
@@ -300,6 +423,16 @@ REACT_APP_API_URL=http://localhost:3000
 # Webhook Configuration
 WEBHOOK_SECRET=${WEBHOOK_SECRET}
 WEBHOOK_PORT=${WEBHOOK_PORT}
+WEBHOOK_ENABLE_HTTPS=${WEBHOOK_ENABLE_HTTPS:-true}
+WEBHOOK_CERT_PATH=${PROJECT_DIR}/ssl/webhook.crt
+WEBHOOK_KEY_PATH=${PROJECT_DIR}/ssl/webhook.key
+WEBHOOK_DOMAIN=${WEBHOOK_DOMAIN:-}
+WEBHOOK_EMAIL=${WEBHOOK_EMAIL:-}
+
+# SSL Configuration
+ENABLE_LETS_ENCRYPT=${ENABLE_LETS_ENCRYPT:-false}
+LETS_ENCRYPT_STAGING=${LETS_ENCRYPT_STAGING:-true}
+SSL_CERT_PATH=${PROJECT_DIR}/ssl
 
 # Security
 JWT_SECRET=${JWT_SECRET}

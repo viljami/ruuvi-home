@@ -38,6 +38,93 @@ generate_secure_passwords() {
     log_info "$context" "Passwords will be saved to .env file during setup"
 }
 
+# Configure HTTPS settings
+configure_https_settings() {
+    local context="$MAIN_CONTEXT"
+    
+    if [ "${ENABLE_HTTPS}" != "true" ]; then
+        export WEBHOOK_ENABLE_HTTPS="false"
+        log_info "$context" "HTTPS disabled by configuration"
+        return 0
+    fi
+    
+    log_section "HTTPS Configuration"
+    
+    echo -e "${COLOR_YELLOW}HTTPS Configuration for Local Pi:${COLOR_NC}"
+    echo "1) IP-based certificate (default) - Works with Pi's IP address"
+    echo "2) Let's Encrypt certificate - Requires public domain name"
+    echo ""
+    echo "For local Pi deployment, option 1 is recommended."
+    echo "Your Pi's IP: $(hostname -I | awk '{print $1}')"
+    echo ""
+    
+    # Check for non-interactive mode
+    if [ -n "$ENABLE_LETS_ENCRYPT" ] && [ "$ENABLE_LETS_ENCRYPT" = "true" ]; then
+        log_info "$context" "Non-interactive mode: Using Let's Encrypt"
+        
+        if [ -z "$WEBHOOK_DOMAIN" ]; then
+            log_error "$context" "Let's Encrypt requires WEBHOOK_DOMAIN environment variable"
+            log_error "$context" "Example: export WEBHOOK_DOMAIN=webhook.yourdomain.com"
+            return 1
+        fi
+        
+        # Check if domain is actually an IP address
+        if [[ "$WEBHOOK_DOMAIN" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            log_error "$context" "Let's Encrypt cannot issue certificates for IP addresses"
+            log_error "$context" "Use a real domain name or choose option 1 for IP-based certificates"
+            return 1
+        fi
+        
+        if [ -z "$WEBHOOK_EMAIL" ]; then
+            log_error "$context" "Let's Encrypt requires WEBHOOK_EMAIL environment variable"
+            log_error "$context" "Example: export WEBHOOK_EMAIL=admin@yourdomain.com"
+            return 1
+        fi
+    else
+        if [ -z "$ENABLE_LETS_ENCRYPT" ]; then
+            while true; do
+                read -p "Choose HTTPS method (1 or 2): " choice
+                case $choice in
+                    1)
+                        export ENABLE_LETS_ENCRYPT="false"
+                        export WEBHOOK_DOMAIN="$(hostname -I | awk '{print $1}')"
+                        break
+                        ;;
+                    2)
+                        export ENABLE_LETS_ENCRYPT="true"
+                        echo ""
+                        echo "Let's Encrypt requires a public domain name that points to your Pi."
+                        echo "This will NOT work with just an IP address."
+                        echo ""
+                        read -p "Enter your public domain name (e.g., webhook.yourdomain.com): " domain_input
+                        read -p "Enter your email address: " email_input
+                        export WEBHOOK_DOMAIN="$domain_input"
+                        export WEBHOOK_EMAIL="$email_input"
+                        break
+                        ;;
+                    *)
+                        echo "Invalid choice. Please enter 1 or 2."
+                        ;;
+                esac
+            done
+        fi
+    fi
+    
+    # Configure based on HTTPS method
+    if [ "$ENABLE_LETS_ENCRYPT" = "true" ]; then
+        log_info "$context" "Selected: Let's Encrypt SSL certificate"
+        log_info "$context" "Domain: $WEBHOOK_DOMAIN"
+        log_info "$context" "Email: $WEBHOOK_EMAIL"
+    else
+        log_info "$context" "Selected: IP-based SSL certificate"
+        log_info "$context" "Certificate will be valid for IP: $WEBHOOK_DOMAIN"
+        log_info "$context" "GitHub webhook will need SSL verification disabled"
+    fi
+    
+    export WEBHOOK_ENABLE_HTTPS="true"
+    log_success "$context" "HTTPS configuration completed"
+}
+
 # Choose deployment mode
 choose_deployment_mode() {
     local context="$MAIN_CONTEXT"
@@ -155,6 +242,12 @@ load_config() {
     export ENABLE_BACKUP_CRON="${ENABLE_BACKUP_CRON:-true}"
     export ENABLE_MONITORING="${ENABLE_MONITORING:-true}"
     export ENABLE_FIREWALL="${ENABLE_FIREWALL:-true}"
+    export ENABLE_HTTPS="${ENABLE_HTTPS:-true}"
+    export ENABLE_LETS_ENCRYPT="${ENABLE_LETS_ENCRYPT:-false}"
+    
+    # Default to Pi's IP address for local certificates
+    local pi_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "192.168.1.100")
+    export DEFAULT_WEBHOOK_DOMAIN="$pi_ip"
     
     # Backup configuration
     export BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
@@ -169,6 +262,13 @@ load_config() {
     export DOCKER_COMPOSE_FILE="${DOCKER_COMPOSE_FILE:-}"
     export GITHUB_REGISTRY="${GITHUB_REGISTRY:-ghcr.io}"
     export GITHUB_REPO="${GITHUB_REPO:-}"
+    
+    # HTTPS/SSL Configuration
+    export WEBHOOK_ENABLE_HTTPS="${WEBHOOK_ENABLE_HTTPS:-true}"
+    export WEBHOOK_DOMAIN="${WEBHOOK_DOMAIN:-$DEFAULT_WEBHOOK_DOMAIN}"
+    export WEBHOOK_EMAIL="${WEBHOOK_EMAIL:-}"
+    export SSL_CERT_PATH="$PROJECT_DIR/ssl"
+    export LETS_ENCRYPT_STAGING="${LETS_ENCRYPT_STAGING:-true}"
     
     # Colors for output
     export COLOR_GREEN='\033[0;32m'
@@ -190,6 +290,7 @@ readonly SETUP_MODULES=(
     "02-docker-setup.sh:Docker Installation"
     "03-directories.sh:Directory Structure"
     "04-file-generation.sh:File Generation"
+    "08-ssl-setup.sh:SSL Certificate Setup"
     "05-systemd-services.sh:System Services"
     "06-backup-system.sh:Backup System"
     "07-monitoring.sh:Monitoring Setup"
@@ -287,6 +388,7 @@ execute_module() {
     export RUUVI_USER PROJECT_DIR DATA_DIR LOG_DIR BACKUP_DIR
     export POSTGRES_PASSWORD MQTT_PASSWORD WEBHOOK_SECRET JWT_SECRET SESSION_SECRET
     export DEPLOYMENT_MODE DOCKER_COMPOSE_FILE GITHUB_REGISTRY GITHUB_REPO
+    export WEBHOOK_ENABLE_HTTPS WEBHOOK_DOMAIN WEBHOOK_EMAIL ENABLE_LETS_ENCRYPT SSL_CERT_PATH LETS_ENCRYPT_STAGING
     
     # Execute module with error handling
     if bash "$module_path"; then
@@ -358,6 +460,8 @@ Project Directory: $PROJECT_DIR
 Configuration:
 - Deployment Mode: $DEPLOYMENT_MODE
 - Docker Compose File: $DOCKER_COMPOSE_FILE
+- HTTPS Enabled: ${WEBHOOK_ENABLE_HTTPS:-false}
+- Let's Encrypt: ${ENABLE_LETS_ENCRYPT:-false}
 - Webhook Port: $WEBHOOK_PORT
 - Frontend Port: $FRONTEND_PORT
 - API Port: $API_PORT
@@ -444,6 +548,12 @@ main() {
     # Choose deployment mode
     if ! choose_deployment_mode; then
         log_error "$context" "Deployment mode selection failed"
+        exit 1
+    fi
+    
+    # Configure HTTPS settings
+    if ! configure_https_settings; then
+        log_error "$context" "HTTPS configuration failed"
         exit 1
     fi
     

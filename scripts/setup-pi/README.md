@@ -60,6 +60,169 @@ export GITHUB_REPO=username/ruuvi-home  # required for registry mode
 sudo ./scripts/setup-pi/setup-pi.sh
 ```
 
+## HTTPS Webhook Configuration
+
+The setup system includes built-in HTTPS support for secure webhook communication with GitHub.
+
+### HTTPS Options
+
+#### 1. Self-Signed Certificate (Default)
+- **Best for**: Development and internal networks
+- **Setup**: Automatic during installation
+- **Security**: Encrypted traffic, but browsers will show warnings
+- **Configuration**: No additional setup required
+
+#### 2. Let's Encrypt Certificate (Recommended for Production)
+- **Best for**: Production deployments with public domain
+- **Setup**: Automatic with valid domain name
+- **Security**: Trusted by all browsers and GitHub
+- **Requirements**: Public domain name pointing to your Pi
+
+### HTTPS Configuration
+
+#### Interactive Setup
+The setup script will prompt for HTTPS configuration:
+```bash
+sudo ./scripts/setup-pi/setup-pi.sh
+# Will ask: "Choose HTTPS method: 1) Self-signed 2) Let's Encrypt"
+```
+
+#### Non-Interactive Setup
+
+**Self-Signed Certificate:**
+```bash
+export DEPLOYMENT_MODE=registry
+export GITHUB_REPO=username/ruuvi-home
+export ENABLE_HTTPS=true
+export ENABLE_LETS_ENCRYPT=false
+sudo ./scripts/setup-pi/setup-pi.sh
+```
+
+**Let's Encrypt Certificate:**
+```bash
+export DEPLOYMENT_MODE=registry
+export GITHUB_REPO=username/ruuvi-home
+export ENABLE_HTTPS=true
+export ENABLE_LETS_ENCRYPT=true
+export WEBHOOK_DOMAIN=webhook.yourdomain.com
+export WEBHOOK_EMAIL=admin@yourdomain.com
+export LETS_ENCRYPT_STAGING=false  # Use 'true' for testing
+sudo ./scripts/setup-pi/setup-pi.sh
+```
+
+### GitHub Webhook Configuration with HTTPS
+
+#### For Self-Signed Certificates:
+1. **GitHub Repository → Settings → Webhooks → Add webhook**
+2. **Configuration:**
+   - Payload URL: `https://YOUR_PI_IP:9000`
+   - Content type: `application/json`
+   - Secret: [from `/home/pi/ruuvi-home/.env`]
+   - SSL verification: ❌ **Disable** (required for self-signed)
+   - Events: ✅ Just the push event
+
+#### For Let's Encrypt Certificates:
+1. **GitHub Repository → Settings → Webhooks → Add webhook**
+2. **Configuration:**
+   - Payload URL: `https://webhook.yourdomain.com:9000`
+   - Content type: `application/json`
+   - Secret: [from `/home/pi/ruuvi-home/.env`]
+   - SSL verification: ✅ **Enable** (trusted certificate)
+   - Events: ✅ Just the push event
+
+### Certificate Management
+
+#### Automatic Renewal (Let's Encrypt)
+- Certificates auto-renew every 12 hours via cron
+- Webhook service automatically restarts after renewal
+- Logs available at: `/var/log/ruuvi-home/ssl-renewal.log`
+
+#### Manual Certificate Operations
+```bash
+# Check certificate status
+openssl x509 -in /home/pi/ruuvi-home/ssl/webhook.crt -noout -dates
+
+# Force Let's Encrypt renewal
+sudo certbot renew --force-renewal
+
+# View webhook logs
+journalctl -u ruuvi-webhook -f
+
+# Restart webhook service
+sudo systemctl restart ruuvi-webhook
+```
+
+### Security Considerations
+
+#### Production Security Checklist:
+- ✅ Use Let's Encrypt for trusted certificates
+- ✅ Keep webhook secret secure (32+ character random string)
+- ✅ Enable firewall (UFW configured automatically)
+- ✅ Regular certificate monitoring
+- ✅ Restrict webhook access to GitHub IP ranges
+
+#### Network Security:
+```bash
+# Restrict webhook to GitHub IPs only (optional)
+sudo ufw delete allow 9000/tcp
+sudo ufw allow from 140.82.112.0/20 to any port 9000
+sudo ufw allow from 185.199.108.0/22 to any port 9000
+sudo ufw allow from 192.30.252.0/22 to any port 9000
+```
+
+### Troubleshooting HTTPS
+
+#### Common Issues:
+
+**Certificate Generation Failed:**
+```bash
+# Check OpenSSL installation
+openssl version
+
+# Regenerate self-signed certificate
+sudo rm -f /home/pi/ruuvi-home/ssl/*
+sudo systemctl restart ruuvi-webhook
+```
+
+**Let's Encrypt Validation Failed:**
+```bash
+# Check domain DNS resolution
+nslookup webhook.yourdomain.com
+
+# Check port 80 accessibility (required for validation)
+sudo ufw allow 80/tcp
+curl -I http://webhook.yourdomain.com/.well-known/acme-challenge/test
+
+# Use staging server for testing
+export LETS_ENCRYPT_STAGING=true
+```
+
+**GitHub Webhook SSL Errors:**
+- Self-signed: Disable SSL verification in GitHub webhook settings
+- Let's Encrypt: Ensure certificate is valid and not staging
+- Check certificate expiry: `openssl x509 -in cert.crt -noout -dates`
+
+**Service Not Starting:**
+```bash
+# Check webhook service logs
+journalctl -u ruuvi-webhook -f
+
+# Validate certificate files
+openssl x509 -in /home/pi/ruuvi-home/ssl/webhook.crt -text -noout
+openssl rsa -in /home/pi/ruuvi-home/ssl/webhook.key -check
+```
+
+### Environment Variables Reference
+
+| Variable | Description | Default | Example |
+|----------|-------------|---------|---------|
+| `ENABLE_HTTPS` | Enable HTTPS for webhook | `true` | `true`, `false` |
+| `ENABLE_LETS_ENCRYPT` | Use Let's Encrypt certificate | `false` | `true`, `false` |
+| `WEBHOOK_DOMAIN` | Domain for Let's Encrypt | none | `webhook.domain.com` |
+| `WEBHOOK_EMAIL` | Email for Let's Encrypt | none | `admin@domain.com` |
+| `WEBHOOK_PORT` | Webhook server port | `9000` | `9000`, `8443` |
+| `LETS_ENCRYPT_STAGING` | Use staging server | `true` | `true`, `false` |
+
 ## Architecture
 
 The setup system follows clean separation of concerns:
@@ -68,9 +231,7 @@ The setup system follows clean separation of concerns:
 - **Python**: File generation and templating (Jinja2)
 - **YAML**: Configuration (replacing bash env files)
 - **Templates**: Clean, reusable file templates
-</text>
 
-<old_text>
 ### Complete Setup
 ```bash
 sudo ./scripts/setup-pi.sh

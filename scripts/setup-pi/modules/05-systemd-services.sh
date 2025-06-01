@@ -241,7 +241,7 @@ configure_firewall() {
         "ufw allow from 192.168.0.0/16 to any port 3000:Allow API from 192.168.x.x"
         "ufw allow from 10.0.0.0/8 to any port 3000:Allow API from 10.x.x.x"
         "ufw allow from 172.16.0.0/12 to any port 3000:Allow API from 172.16-31.x.x"
-        "ufw allow 9000/tcp:Allow webhook port"
+        "ufw allow ${WEBHOOK_PORT:-9000}/tcp:Allow webhook port"
         "ufw deny 5432/tcp:Deny direct database access"
         "ufw deny 1883/tcp:Deny direct MQTT access"
     )
@@ -278,7 +278,13 @@ show_service_status() {
     echo "=== Service Ports ==="
     echo "Frontend (HTTP): http://$(hostname -I | awk '{print $1}'):${FRONTEND_PORT:-80}"
     echo "API: http://$(hostname -I | awk '{print $1}'):${API_PORT:-8080}"
-    echo "Webhook: http://$(hostname -I | awk '{print $1}'):${WEBHOOK_PORT:-9000}"
+    
+    # Show webhook URL based on HTTPS configuration
+    local webhook_protocol="http"
+    if [ "${WEBHOOK_ENABLE_HTTPS:-true}" = "true" ]; then
+        webhook_protocol="https"
+    fi
+    echo "Webhook: ${webhook_protocol}://$(hostname -I | awk '{print $1}'):${WEBHOOK_PORT:-9000}"
     echo ""
 }
 
