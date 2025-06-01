@@ -203,12 +203,62 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push Docker image
+      - name: Network connectivity check
+        run: |
+          echo "Checking network connectivity..."
+          ping -c 3 8.8.8.8 || echo "Warning: Network connectivity issues detected"
+          nslookup deb.debian.org || echo "Warning: DNS resolution issues detected"
+
+      - name: Build and push Docker image (attempt 1)
+        id: build_attempt_1
+        continue-on-error: true
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
           file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Clean Docker cache and retry build (attempt 2)
+        if: steps.build_attempt_1.outcome == 'failure'
+        run: |
+          echo "First build attempt failed, cleaning cache and retrying..."
+          docker builder prune -f
+          sleep 10
+
+      - name: Build and push Docker image (attempt 2)
+        if: steps.build_attempt_1.outcome == 'failure'
+        id: build_attempt_2
+        continue-on-error: true
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
+          file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Final build attempt (attempt 3)
+        if: steps.build_attempt_1.outcome == 'failure' && steps.build_attempt_2.outcome == 'failure'
+        run: |
+          echo "Second build attempt failed, final retry with reduced platforms..."
+          docker builder prune -f
+          sleep 15
+
+      - name: Build and push Docker image (final attempt - amd64 only)
+        if: steps.build_attempt_1.outcome == 'failure' && steps.build_attempt_2.outcome == 'failure'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
+          file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

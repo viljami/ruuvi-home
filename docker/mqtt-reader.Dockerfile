@@ -1,8 +1,20 @@
-FROM rust:1.87-slim-bullseye AS builder
+FROM rust:1.87-slim-bookworm AS builder
 
 WORKDIR /usr/src/ruuvi-home
 
-RUN apt-get update && apt-get install -y pkg-config libssl-dev binutils && rm -rf /var/lib/apt/lists/*
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends \
+            pkg-config \
+            libssl-dev \
+            binutils \
+            ca-certificates && \
+        rm -rf /var/lib/apt/lists/* && \
+        break || { \
+            echo "Attempt $i failed, retrying in 5 seconds..."; \
+            sleep 5; \
+        } \
+    done
 
 COPY backend/Cargo.toml ./Cargo.toml
 COPY backend/packages/ ./packages/

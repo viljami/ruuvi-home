@@ -92,6 +92,47 @@ pre-commit run --all-files
 
 **Important:** Use Makefile targets (not direct tool commands) to ensure consistency between local development and CI environments.
 
+### Docker Build Troubleshooting
+
+If you encounter Docker build failures (especially network connectivity issues), use the troubleshooting script:
+
+```bash
+# Check system and network status
+./scripts/docker-build-fix.sh check
+
+# Clean Docker cache and retry
+./scripts/docker-build-fix.sh clean
+
+# Build specific service with retry logic
+./scripts/docker-build-fix.sh build mqtt-reader
+./scripts/docker-build-fix.sh build api-server
+
+# Build all services
+./scripts/docker-build-fix.sh build-all
+
+# Get detailed diagnostics
+./scripts/docker-build-fix.sh diagnose
+```
+
+**Common issues and solutions:**
+
+- **Network timeouts**: The script includes automatic retry logic with backoff
+- **Package download failures**: Updated Dockerfiles use Debian Bookworm with retry logic
+- **Cache corruption**: Use `clean` command to clear Docker build cache
+- **Multi-platform issues**: Final CI retry uses amd64-only as fallback
+
+**Manual troubleshooting:**
+
+```bash
+# Clear all Docker cache
+docker builder prune -f
+docker system prune -f
+
+# Build locally for testing
+docker build -f docker/mqtt-reader.Dockerfile -t ruuvi-mqtt-reader .
+docker build -f docker/api-server.Dockerfile -t ruuvi-api-server .
+```
+
 ## Project Structure
 
 ```

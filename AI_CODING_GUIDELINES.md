@@ -3,6 +3,7 @@
 ## 🚨 CRITICAL: Rust Code Quality Enforcement
 
 **NEVER use direct cargo commands:**
+
 ```bash
 # ❌ FORBIDDEN:
 cargo clippy
@@ -11,6 +12,7 @@ cargo test
 ```
 
 **ALWAYS use Makefile targets:**
+
 ```bash
 # ✅ REQUIRED:
 make lint     # fmt-check + clippy-app + clippy-test
@@ -37,12 +39,14 @@ make test     # run all tests
 ### Zero Tolerance for Redundancy
 
 **NEVER create duplicate information**:
+
 - Same validation commands in multiple files
-- Identical explanations across documents  
+- Identical explanations across documents
 - Repeated code examples or instructions
 - Overlapping documentation sections
 
 **MANDATORY before any addition**:
+
 1. Search existing files for similar content
 2. If ANY overlap exists, consolidate instead of duplicating
 3. If absolutely certain you need repetition: **ASK FOR EXPLICIT CONFIRMATION**
@@ -51,6 +55,7 @@ make test     # run all tests
 ### Simplicity Requirements
 
 **Always choose the simpler option**:
+
 - One Makefile target instead of multiple scripts
 - Concise documentation over verbose explanations
 - Single source of truth over distributed information
@@ -61,6 +66,7 @@ make test     # run all tests
 ## 📋 Essential Workflow
 
 ### Before Code Changes
+
 - [ ] Understand current milestone (VISION.md, MILESTONES.md)
 - [ ] Define task scope explicitly
 - [ ] Plan rollback strategy
@@ -70,23 +76,26 @@ make test     # run all tests
 **MANDATORY**: All code must be automatically formatted before commit.
 
 **One-time setup** (run once per development environment):
+
 ```bash
 ./scripts/setup-dev.sh
 ```
 
 **Pre-commit hooks automatically**:
+
 - Format all code on every commit
-- Run linting checks  
+- Run linting checks
 - Validate file structure
 - Sort imports
 - Fix trailing whitespace
 
 **Manual formatting** (if needed):
+
 ```bash
 # Rust (backend)
 cd backend && make fmt
 
-# Python (MQTT simulator)  
+# Python (MQTT simulator)
 cd docker/mqtt-simulator && make fmt
 
 # All files
@@ -98,21 +107,25 @@ pre-commit run --all-files
 ### Language-Specific Validation
 
 **Rust** (backend):
+
 ```bash
 cd backend && make lint && make test
 ```
 
 **TypeScript** (frontend):
+
 ```bash
 cd frontend && npm run lint && npm test
 ```
 
 **Python** (simulator):
+
 ```bash
 python -m flake8 . && python -m pytest
 ```
 
 ### After Every Code Edit
+
 - [ ] **Syntax**: Language-specific check (make build, npx tsc --noEmit, etc.)
 - [ ] **Linting**: Zero warnings (make lint, npm run lint, flake8)
 - [ ] **Tests**: Relevant test suites pass
@@ -137,6 +150,7 @@ python -m flake8 . && python -m pytest
 ## 🚫 Anti-Patterns
 
 **Avoid**:
+
 - Global state and hidden dependencies
 - Copy-paste code (abstract immediately)
 - Magic numbers and strings
@@ -144,6 +158,7 @@ python -m flake8 . && python -m pytest
 - Inconsistent naming conventions
 
 **Detection Signals**:
+
 - Hard to test in isolation
 - Changes require modifying multiple files
 - Difficult to explain component purpose in one sentence
@@ -173,6 +188,7 @@ python -m flake8 . && python -m pytest
 ## ✅ Validation Checklist
 
 ### Code Quality
+
 - [ ] Linting passes with zero warnings
 - [ ] Code formatting is consistent
 - [ ] Tests cover new functionality
@@ -180,6 +196,7 @@ python -m flake8 . && python -m pytest
 - [ ] Error handling implemented
 
 ### Integration
+
 - [ ] Builds successfully
 - [ ] Integration tests pass
 - [ ] API contracts maintained
@@ -187,6 +204,7 @@ python -m flake8 . && python -m pytest
 - [ ] Security reviewed
 
 ### Deployment
+
 - [ ] Environment compatibility verified
 - [ ] Migration scripts tested
 - [ ] Rollback plan prepared
@@ -202,3 +220,7 @@ python -m flake8 . && python -m pytest
 **Production Issues**: Immediate rollback, then investigate and fix forward.
 
 **Always**: Prioritize system stability over feature delivery.
+
+## Other
+
+Favor `ripgrep` over `grep`, it is 100_000x faster, if istalled the command for ripgrep is `rg`
