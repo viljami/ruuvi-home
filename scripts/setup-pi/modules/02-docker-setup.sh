@@ -61,27 +61,41 @@ install_docker_engine() {
     apt-get update
     apt-get install -y ca-certificates curl gnupg lsb-release
 
-    # Add Docker's official GPG key
-    mkdir -p /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-    chmod a+r /etc/apt/keyrings/docker.gpg
-
-    # Determine architecture and codename
+    # Determine OS type and repository details first
     local arch=$(dpkg --print-architecture)
     local codename=$(lsb_release -cs)
+    local repo_url="https://download.docker.com/linux/ubuntu"
+    local gpg_url="https://download.docker.com/linux/ubuntu/gpg"
 
-    # For Raspberry Pi OS, use appropriate repository
+    # Detect OS type and set appropriate repository
     if [ -f /etc/os-release ]; then
         . /etc/os-release
-        if [ "$ID" = "raspbian" ]; then
-            codename="bookworm"  # Use stable Debian codename for Raspberry Pi OS
-            local repo_url="https://download.docker.com/linux/debian"
+        log_info "$context" "Detected OS: $ID $VERSION_CODENAME"
+
+        # Handle Debian-based systems (including Raspberry Pi OS)
+        if [ "$ID" = "debian" ] || [ "$ID" = "raspbian" ] || [ "$ID_LIKE" = "debian" ]; then
+            repo_url="https://download.docker.com/linux/debian"
+            gpg_url="https://download.docker.com/linux/debian/gpg"
+
+            # Use stable Debian codename for Raspberry Pi OS
+            if [ "$ID" = "raspbian" ]; then
+                codename="bookworm"
+            fi
+
+            log_info "$context" "Using Debian Docker repository"
         else
-            local repo_url="https://download.docker.com/linux/ubuntu"
+            log_info "$context" "Using Ubuntu Docker repository"
         fi
     else
-        local repo_url="https://download.docker.com/linux/ubuntu"
+        log_warn "$context" "Could not detect OS, defaulting to Ubuntu repository"
     fi
+
+    log_info "$context" "Repository: $repo_url, Codename: $codename, Architecture: $arch"
+
+    # Add Docker's official GPG key
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL "$gpg_url" | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
 
     # Add Docker repository
     echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] $repo_url $codename stable" > /etc/apt/sources.list.d/docker.list
