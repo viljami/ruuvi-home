@@ -48,14 +48,14 @@ readonly REQUIRED_PACKAGES=(
 # Update package lists
 update_package_lists() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Updating package lists"
-    
+
     if ! apt-get -qq update; then
         log_error "$context" "Failed to update package lists"
         return 1
     fi
-    
+
     log_success "$context" "Package lists updated"
     return 0
 }
@@ -64,19 +64,19 @@ update_package_lists() {
 install_required_packages() {
     local context="$MODULE_CONTEXT"
     local failed_packages=()
-    
+
     log_info "$context" "Installing required packages"
-    
+
     # Update package lists first
     if ! update_package_lists; then
         return 1
     fi
-    
+
     # Install packages with minimal interaction
     export DEBIAN_FRONTEND=noninteractive
-    
+
     local packages_to_install=()
-    
+
     # Check which packages are not installed
     for package in "${REQUIRED_PACKAGES[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
@@ -85,31 +85,31 @@ install_required_packages() {
             log_debug "$context" "Package already installed: $package"
         fi
     done
-    
+
     if [ ${#packages_to_install[@]} -eq 0 ]; then
         log_success "$context" "All required packages already installed"
         return 0
     fi
-    
+
     log_info "$context" "Installing ${#packages_to_install[@]} packages: ${packages_to_install[*]}"
-    
+
     if ! apt-get -y -qq install "${packages_to_install[@]}"; then
         log_error "$context" "Failed to install packages: ${packages_to_install[*]}"
         return 1
     fi
-    
+
     # Verify installation
     for package in "${packages_to_install[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             failed_packages+=("$package")
         fi
     done
-    
+
     if [ ${#failed_packages[@]} -gt 0 ]; then
         log_error "$context" "Failed to install packages: ${failed_packages[*]}"
         return 1
     fi
-    
+
     log_success "$context" "All required packages installed successfully"
     return 0
 }
@@ -117,46 +117,46 @@ install_required_packages() {
 # Configure Fish shell
 configure_fish_shell() {
     local context="$MODULE_CONTEXT"
-    
+
     if [ "$ENABLE_FISH_SHELL" != "true" ]; then
         log_info "$context" "Fish shell configuration disabled"
         return 0
     fi
-    
+
     log_info "$context" "Configuring Fish shell for user: $RUUVI_USER"
-    
+
     # Verify Fish is installed
     if ! command -v fish &> /dev/null; then
         log_error "$context" "Fish shell not installed"
         return 1
     fi
-    
+
     # Get current shell
     local current_shell=$(getent passwd "$RUUVI_USER" | cut -d: -f7)
     local fish_path=$(which fish)
-    
+
     if [ "$current_shell" = "$fish_path" ]; then
         log_success "$context" "Fish shell already configured for $RUUVI_USER"
         return 0
     fi
-    
+
     # Add Fish to /etc/shells if not present
     if ! grep -q "$fish_path" /etc/shells; then
         log_info "$context" "Adding Fish to /etc/shells"
         echo "$fish_path" >> /etc/shells
     fi
-    
+
     # Change user shell to Fish
     if ! chsh -s "$fish_path" "$RUUVI_USER"; then
         log_error "$context" "Failed to set Fish as default shell for $RUUVI_USER"
         return 1
     fi
-    
+
     # Create Fish config directory
     local fish_config_dir="/home/$RUUVI_USER/.config/fish"
     mkdir -p "$fish_config_dir"
     chown -R "$RUUVI_USER:$RUUVI_USER" "/home/$RUUVI_USER/.config"
-    
+
     # Create basic Fish configuration
     cat > "$fish_config_dir/config.fish" << EOF
 # Ruuvi Home Fish Configuration
@@ -185,9 +185,9 @@ alias ruuvi-restart='sudo systemctl restart ruuvi-home ruuvi-webhook'
 # Set PATH for local scripts
 set -gx PATH \$PATH /home/$RUUVI_USER/ruuvi-home/scripts
 EOF
-    
+
     chown "$RUUVI_USER:$RUUVI_USER" "$fish_config_dir/config.fish"
-    
+
     log_success "$context" "Fish shell configured for $RUUVI_USER"
     return 0
 }
@@ -195,23 +195,23 @@ EOF
 # Configure system timezone
 configure_timezone() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Configuring system timezone: $TZ"
-    
+
     # Check current timezone
     local current_tz=$(timedatectl show -p Timezone --value)
-    
+
     if [ "$current_tz" = "$TZ" ]; then
         log_success "$context" "Timezone already set to $TZ"
         return 0
     fi
-    
+
     # Set timezone
     if ! timedatectl set-timezone "$TZ"; then
         log_error "$context" "Failed to set timezone to $TZ"
         return 1
     fi
-    
+
     # Verify timezone change
     local new_tz=$(timedatectl show -p Timezone --value)
     if [ "$new_tz" = "$TZ" ]; then
@@ -220,7 +220,7 @@ configure_timezone() {
         log_error "$context" "Timezone verification failed"
         return 1
     fi
-    
+
     return 0
 }
 
@@ -228,30 +228,30 @@ configure_timezone() {
 configure_locale() {
     local context="$MODULE_CONTEXT"
     local target_locale="en_US.UTF-8"
-    
+
     log_info "$context" "Configuring system locale"
-    
+
     # Check if locale is already configured
     if locale | grep -q "LANG=$target_locale"; then
         log_success "$context" "Locale already configured"
         return 0
     fi
-    
+
     # Check if target locale is available, if not try alternatives
     if ! locale -a | grep -q -E "(en_US\.utf8|en_US\.UTF-8)"; then
         log_info "$context" "Generating locale: $target_locale"
-        
+
         # First ensure the locale is uncommented in /etc/locale.gen
         if grep -q "^# *$target_locale" /etc/locale.gen; then
             sed -i "s/^# *$target_locale/$target_locale/" /etc/locale.gen
         elif ! grep -q "^$target_locale" /etc/locale.gen; then
             echo "$target_locale UTF-8" >> /etc/locale.gen
         fi
-        
+
         # Generate the locale
         if ! locale-gen; then
             log_warn "$context" "Failed to generate $target_locale, checking for alternatives"
-            
+
             # Try to use an existing UTF-8 locale as fallback
             local fallback_locale=$(locale -a | grep -E "(en_.*\.utf8|en_.*\.UTF-8)" | head -1)
             if [ -n "$fallback_locale" ]; then
@@ -263,7 +263,7 @@ configure_locale() {
             fi
         fi
     fi
-    
+
     # Update locale only if we have a valid target
     if locale -a | grep -q -E "($(echo $target_locale | tr '[:upper:]' '[:lower:]')|$target_locale)"; then
         if ! update-locale LANG="$target_locale" 2>/dev/null; then
@@ -275,16 +275,16 @@ configure_locale() {
         log_warn "$context" "Target locale $target_locale not available, skipping"
         return 0
     fi
-    
+
     return 0
 }
 
 # Configure log rotation
 configure_log_rotation() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Configuring log rotation for Ruuvi Home"
-    
+
     # Create logrotate configuration for Ruuvi Home
     cat > /etc/logrotate.d/ruuvi-home << EOF
 $LOG_DIR/*.log {
@@ -299,13 +299,13 @@ $LOG_DIR/*.log {
     create 644 $RUUVI_USER $RUUVI_USER
 }
 EOF
-    
+
     # Test logrotate configuration
     if ! logrotate -d /etc/logrotate.d/ruuvi-home &>/dev/null; then
         log_error "$context" "Invalid logrotate configuration"
         return 1
     fi
-    
+
     log_success "$context" "Log rotation configured"
     return 0
 }
@@ -314,9 +314,9 @@ EOF
 enable_required_services() {
     local context="$MODULE_CONTEXT"
     local services=("cron")
-    
+
     log_info "$context" "Enabling required system services"
-    
+
     for service in "${services[@]}"; do
         if ! systemctl is-enabled --quiet "$service"; then
             log_info "$context" "Enabling service: $service"
@@ -325,7 +325,7 @@ enable_required_services() {
                 return 1
             fi
         fi
-        
+
         if ! systemctl is-active --quiet "$service"; then
             log_info "$context" "Starting service: $service"
             if ! systemctl start "$service"; then
@@ -334,7 +334,7 @@ enable_required_services() {
             fi
         fi
     done
-    
+
     log_success "$context" "Required services enabled and started"
     return 0
 }
@@ -343,9 +343,9 @@ enable_required_services() {
 validate_system_setup() {
     local context="$MODULE_CONTEXT"
     local validation_failed=false
-    
+
     log_info "$context" "Validating system setup"
-    
+
     # Check required commands
     local required_commands=("git" "curl" "fish" "python3" "pip3")
     for cmd in "${required_commands[@]}"; do
@@ -354,7 +354,7 @@ validate_system_setup() {
             validation_failed=true
         fi
     done
-    
+
     # Check user shell (if Fish is enabled)
     if [ "$ENABLE_FISH_SHELL" = "true" ]; then
         local user_shell=$(getent passwd "$RUUVI_USER" | cut -d: -f7)
@@ -363,25 +363,25 @@ validate_system_setup() {
             validation_failed=true
         fi
     fi
-    
+
     # Check timezone
     local current_tz=$(timedatectl show -p Timezone --value)
     if [ "$current_tz" != "$TZ" ]; then
         log_error "$context" "Timezone not set correctly: $current_tz (expected: $TZ)"
         validation_failed=true
     fi
-    
+
     # Check services
     if ! systemctl is-active --quiet cron; then
         log_error "$context" "Cron service not running"
         validation_failed=true
     fi
-    
+
     if [ "$validation_failed" = true ]; then
         log_error "$context" "System setup validation failed"
         return 1
     fi
-    
+
     log_success "$context" "System setup validation passed"
     return 0
 }
@@ -399,32 +399,32 @@ setup_system() {
         "enable_required_services:Enable required services"
         "validate_system_setup:Validate system setup"
     )
-    
+
     log_section "System Setup"
     log_info "$context" "Starting system setup for user: $RUUVI_USER"
-    
+
     local step_num=1
     local total_steps=${#setup_steps[@]}
     local failed_steps=()
-    
+
     for step in "${setup_steps[@]}"; do
         local func_name="${step%:*}"
         local step_desc="${step#*:}"
-        
+
         log_step "$step_num" "$total_steps" "$step_desc"
-        
+
         if ! $func_name; then
             failed_steps+=("$step_desc")
         fi
-        
+
         ((step_num++))
     done
-    
+
     if [ ${#failed_steps[@]} -gt 0 ]; then
         log_error "$context" "System setup failed at: ${failed_steps[*]}"
         return 1
     fi
-    
+
     log_success "$context" "System setup completed successfully"
     return 0
 }

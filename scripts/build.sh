@@ -138,31 +138,31 @@ fi
 # Setup environment
 setup_environment() {
     log_section "Setting Up Build Environment"
-    
+
     # Check Docker availability
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed or not in PATH"
         exit 1
     fi
-    
+
     # Check Docker daemon
     if ! docker info > /dev/null 2>&1; then
         log_error "Docker daemon is not running"
         exit 1
     fi
-    
+
     # Disable BuildKit to ensure compatibility with standard Docker
     export DOCKER_BUILDKIT=0
-    
+
     log_success "Build environment ready"
 }
 
 # Analyze build context
 analyze_build_context() {
     log_section "Analyzing Build Context"
-    
+
     cd "$PROJECT_ROOT"
-    
+
     # Check for .dockerignore files
     local missing_dockerignore=()
     if [ ! -f ".dockerignore" ]; then
@@ -174,14 +174,14 @@ analyze_build_context() {
     if [ ! -f "backend/.dockerignore" ]; then
         missing_dockerignore+=("backend")
     fi
-    
+
     if [ ${#missing_dockerignore[@]} -gt 0 ]; then
         log_warning "Missing .dockerignore files: ${missing_dockerignore[*]}"
         log_info "This may result in slower builds due to large build context"
     else
         log_success "All .dockerignore files present"
     fi
-    
+
     # Check context sizes
     local total_size=$(du -sh . 2>/dev/null | cut -f1)
     log_info "Total project size: $total_size"
@@ -193,39 +193,39 @@ build_service() {
     local dockerfile=$2
     local context=$3
     local extra_args=${4:-""}
-    
+
     log_info "Building $service..."
-    
+
     local build_cmd="docker build"
     local tag="${REGISTRY}/${service}:latest"
-    
+
     # Add cache arguments
     if [ "$USE_CACHE" = false ]; then
         build_cmd="$build_cmd --no-cache"
     fi
-    
+
     # Add verbose output if requested
     if [ "$VERBOSE" = true ]; then
         build_cmd="$build_cmd --progress=plain"
     fi
-    
+
     # Add extra build arguments
     if [ -n "$extra_args" ]; then
         build_cmd="$build_cmd $extra_args"
     fi
-    
+
     # Complete build command
     build_cmd="$build_cmd -f $dockerfile -t $tag $context"
-    
+
     if [ "$VERBOSE" = true ]; then
         echo "Build command: $build_cmd"
     fi
-    
+
     if [ "$DRY_RUN" = true ]; then
         echo "DRY RUN: $build_cmd"
         return 0
     fi
-    
+
     # Execute build
     if eval "$build_cmd"; then
         log_success "Built $service successfully"
@@ -239,11 +239,11 @@ build_service() {
 # Build services
 build_services() {
     log_section "Building Services"
-    
+
     cd "$PROJECT_ROOT"
-    
+
     local services_to_build=()
-    
+
     # Determine which services to build
     for service in $BUILD_SERVICES; do
         case $service in
@@ -259,14 +259,14 @@ build_services() {
                 ;;
         esac
     done
-    
+
     log_info "Building services: ${services_to_build[*]}"
-    
+
     # Build services
     local build_pids=()
     local build_results=()
     local build_logs=()
-    
+
     for service in "${services_to_build[@]}"; do
         case $service in
             mqtt-reader)
@@ -329,24 +329,24 @@ build_services() {
                 ;;
         esac
     done
-    
+
     # Wait for parallel builds to complete
     if [ "$PARALLEL_BUILDS" = true ] && [ ${#build_pids[@]} -gt 0 ]; then
         log_info "Waiting for ${#build_pids[@]} parallel builds to complete..."
-        
+
         for i in "${!build_pids[@]}"; do
             local pid=${build_pids[$i]}
             local log_file=${build_logs[$i]}
-            
+
             wait "$pid"
-            
+
             # Show build output if verbose or if build failed
             if [ "$VERBOSE" = true ] && [ -f "$log_file" ]; then
                 echo "=== Build output for PID $pid ==="
                 cat "$log_file"
                 echo "=== End build output ==="
             fi
-            
+
             # Get result from temp file
             local service_name=$(basename "$log_file" | sed 's/.*_\([^_]*\)_[0-9]*/\1/')
             local result_file="/tmp/build_result_${service_name}_$$"
@@ -357,12 +357,12 @@ build_services() {
             else
                 build_results+=(1)
             fi
-            
+
             # Clean up log file
             rm -f "$log_file"
         done
     fi
-    
+
     # Check results
     local failed_builds=0
     for result in "${build_results[@]}"; do
@@ -370,7 +370,7 @@ build_services() {
             ((failed_builds++))
         fi
     done
-    
+
     if [ "$failed_builds" -eq 0 ]; then
         log_success "All builds completed successfully"
         return 0
@@ -383,46 +383,46 @@ build_services() {
 # Cleanup build artifacts
 cleanup_builds() {
     log_section "Cleaning Up Build Artifacts"
-    
+
     if [ "$DRY_RUN" = true ]; then
         echo "DRY RUN: Would clean up build artifacts"
         return 0
     fi
-    
+
     # Clean Docker build cache
     docker builder prune -f 2>/dev/null || true
-    
+
     # Clean up dangling images
     docker image prune -f
-    
+
     # Clean up Rust build artifacts
     if [ -d "$PROJECT_ROOT/backend/target" ]; then
         log_info "Cleaning Rust build artifacts..."
         rm -rf "$PROJECT_ROOT/backend/target"
     fi
-    
+
     # Clean up Node.js build artifacts
     if [ -d "$PROJECT_ROOT/frontend/node_modules" ]; then
         log_info "Cleaning Node.js node_modules..."
         rm -rf "$PROJECT_ROOT/frontend/node_modules"
     fi
-    
+
     if [ -d "$PROJECT_ROOT/frontend/build" ]; then
         log_info "Cleaning React build artifacts..."
         rm -rf "$PROJECT_ROOT/frontend/build"
     fi
-    
+
     # Clean up temporary files
     rm -f /tmp/build_result_*_$$
     rm -f /tmp/build_log_*_$$
-    
+
     log_success "Build artifacts cleaned up"
 }
 
 # Show build statistics
 show_build_stats() {
     log_section "Build Statistics"
-    
+
     # Docker images sizes
     log_info "Docker image sizes:"
     for service in mqtt-reader api-server frontend mqtt-simulator; do
@@ -433,7 +433,7 @@ show_build_stats() {
             echo "  $service: not built"
         fi
     done
-    
+
     # Docker system usage
     echo ""
     docker system df 2>/dev/null || true
@@ -442,15 +442,15 @@ show_build_stats() {
 # Main execution
 main() {
     cd "$PROJECT_ROOT"
-    
+
     if [ "$CLEANUP" = true ]; then
         cleanup_builds
         exit 0
     fi
-    
+
     setup_environment
     analyze_build_context
-    
+
     if build_services; then
         show_build_stats
         log_success "Build completed successfully!"

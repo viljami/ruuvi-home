@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 # Add the parent directory to the path so we can import the simulator module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest  # noqa: E402
 import struct  # noqa: E402
 
+import pytest  # noqa: E402
 import simulator  # noqa: E402
 from ruuvitag_sensor.decoder import get_decoder  # noqa: E402
 

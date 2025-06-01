@@ -75,7 +75,7 @@ const SensorChart: React.FC<SensorChartProps> = ({
   const chartData = useMemo(() => {
     // Group data by sensor
     const sensorData = new Map<string, SensorDataPoint[]>();
-    
+
     data.forEach(point => {
       if (visibleSensors.has(point.sensorId)) {
         if (!sensorData.has(point.sensorId)) {
@@ -89,9 +89,9 @@ const SensorChart: React.FC<SensorChartProps> = ({
     const datasets = Array.from(sensorData.entries()).map(([sensorId, points], index) => {
       const colorIndex = index % SENSOR_COLORS.length;
       const color = SENSOR_COLORS[colorIndex];
-      
+
       const sensorName = points[0]?.sensorName || sensorId;
-      
+
       return {
         label: sensorName,
         data: points

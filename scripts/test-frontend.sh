@@ -40,7 +40,7 @@ echo ""
 echo "🌐 Testing frontend server..."
 if curl -f -s "$FRONTEND_URL" > /dev/null; then
     test_pass "Frontend server is accessible at $FRONTEND_URL"
-    
+
     # Check if it returns HTML
     RESPONSE=$(curl -s "$FRONTEND_URL")
     if echo "$RESPONSE" | grep -q "<!DOCTYPE html>"; then
@@ -48,14 +48,14 @@ if curl -f -s "$FRONTEND_URL" > /dev/null; then
     else
         test_fail "Frontend response is not valid HTML"
     fi
-    
+
     # Check for React app div
     if echo "$RESPONSE" | grep -q 'id="root"'; then
         test_pass "React root element found"
     else
         test_fail "React root element not found"
     fi
-    
+
     # Check for app title
     if echo "$RESPONSE" | grep -q "Ruuvi Home"; then
         test_pass "App title found in HTML"
@@ -73,7 +73,7 @@ echo ""
 echo "🔌 Testing API connectivity..."
 if curl -f -s "$API_URL/health" > /dev/null; then
     test_pass "API server is accessible from frontend context"
-    
+
     # Test CORS (if applicable)
     CORS_HEADER=$(curl -s -H "Origin: $FRONTEND_URL" -H "Access-Control-Request-Method: GET" -H "Access-Control-Request-Headers: X-Requested-With" -X OPTIONS "$API_URL/api/sensors" | grep -i "access-control-allow-origin" || echo "")
     if [ -n "$CORS_HEADER" ] || curl -f -s "$API_URL/api/sensors" > /dev/null; then
@@ -107,7 +107,7 @@ echo ""
 echo "🖼️  Testing static assets..."
 if curl -f -s "$FRONTEND_URL/manifest.json" > /dev/null; then
     test_pass "Manifest.json is accessible"
-    
+
     # Validate manifest content
     MANIFEST_CONTENT=$(curl -s "$FRONTEND_URL/manifest.json")
     if echo "$MANIFEST_CONTENT" | grep -q "Ruuvi Home"; then
@@ -150,14 +150,14 @@ echo ""
 echo "🔧 Testing build type..."
 if echo "$RESPONSE" | grep -q "react.*development"; then
     test_info "Running in development mode"
-    
+
     # Check if React DevTools would be available
     if echo "$RESPONSE" | grep -q "ReactQueryDevtools"; then
         test_pass "React Query DevTools detected (development feature)"
     fi
 else
     test_info "Running in production mode"
-    
+
     # Check for minified assets
     if curl -s "$FRONTEND_URL" | grep -q '\.js.*".*[a-f0-9]\{8\}'; then
         test_pass "Minified/hashed assets detected (production build)"
@@ -169,27 +169,27 @@ echo ""
 echo "📋 Testing project configuration..."
 if [ -f "frontend/package.json" ]; then
     test_pass "package.json exists"
-    
+
     # Check for required scripts
     if grep -q '"start"' frontend/package.json; then
         test_pass "Start script found in package.json"
     else
         test_fail "Start script missing from package.json"
     fi
-    
+
     if grep -q '"build"' frontend/package.json; then
         test_pass "Build script found in package.json"
     else
         test_fail "Build script missing from package.json"
     fi
-    
+
     # Check for required dependencies
     if grep -q '@tanstack/react-query' frontend/package.json; then
         test_pass "React Query dependency found"
     else
         test_fail "React Query dependency missing"
     fi
-    
+
     if grep -q '@mui/material' frontend/package.json; then
         test_pass "Material-UI dependency found"
     else

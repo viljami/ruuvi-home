@@ -53,7 +53,7 @@ describe('App Smoke Tests', () => {
 
   test('displays main navigation elements', async () => {
     renderWithoutRouter(<App />);
-    
+
     expect(screen.getByText('🏠 Ruuvi Home')).toBeInTheDocument();
     expect(screen.getByText('Sensor Monitoring Dashboard')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe('App Smoke Tests', () => {
 
   test('contains required structural elements', async () => {
     renderWithoutRouter(<App />);
-    
+
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
     // Navigation buttons exist but not wrapped in nav element
@@ -72,7 +72,7 @@ describe('App Smoke Tests', () => {
 
   test('overview content is displayed by default', async () => {
     renderWithoutRouter(<App />);
-    
+
     await waitFor(() => {
       expect(screen.getByTestId('overview')).toBeInTheDocument();
     });
@@ -80,17 +80,17 @@ describe('App Smoke Tests', () => {
 
   test('basic app structure is responsive', async () => {
     renderWithoutRouter(<App />);
-    
+
     const header = screen.getByRole('banner');
     const main = screen.getByRole('main');
-    
+
     expect(header).toBeInTheDocument();
     expect(main).toBeInTheDocument();
   });
 
   test('handles router context properly', async () => {
     renderWithoutRouter(<App />);
-    
+
     // Should not throw router-related errors and should render navigation buttons
     expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe('App Smoke Tests', () => {
 
   test('provides query client context', async () => {
     renderWithoutRouter(<App />);
-    
+
     // Should render components that use React Query
     await waitFor(() => {
       expect(screen.getByTestId('overview')).toBeInTheDocument();

@@ -33,7 +33,7 @@ The setup system supports two deployment modes to accommodate different use case
 ### 1. GitHub Registry Mode (Recommended)
 - **Purpose**: Production deployments using pre-built images
 - **How it works**: Pulls Docker images from GitHub Container Registry (ghcr.io)
-- **Benefits**: 
+- **Benefits**:
   - Faster deployment (no local building)
   - Consistent images across environments
   - Reduced Pi resource usage
@@ -405,7 +405,7 @@ config.project.directory
 ```
 
 ```bash
-# In shell templates  
+# In shell templates
 {{ webhook.port }}
 {{ user.name }}
 {{ project.directory }}
@@ -495,9 +495,9 @@ source "$(dirname "$SCRIPT_DIR")/lib/logging.sh"
 setup_feature() {
     local context="$MODULE_CONTEXT"
     log_info "$context" "Setting up feature"
-    
+
     # Implementation here
-    
+
     log_success "$context" "Feature setup completed"
 }
 

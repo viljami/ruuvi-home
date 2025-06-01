@@ -106,10 +106,10 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
 
   if (sensors.length === 0) {
     return (
-      <Box 
+      <Box
         className={className}
-        sx={{ 
-          textAlign: 'center', 
+        sx={{
+          textAlign: 'center',
           py: 4,
           color: 'rgba(255, 255, 255, 0.6)'
         }}
@@ -136,11 +136,11 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
             <Card
               sx={{
                 height: '100%',
-                bgcolor: offline 
-                  ? 'rgba(26, 26, 26, 0.4)' 
+                bgcolor: offline
+                  ? 'rgba(26, 26, 26, 0.4)'
                   : 'rgba(26, 26, 26, 0.8)',
                 backdropFilter: 'blur(20px)',
-                border: offline 
+                border: offline
                   ? '1px solid rgba(244, 67, 54, 0.3)'
                   : '1px solid rgba(255, 255, 255, 0.1)',
                 borderRadius: 3,
@@ -157,9 +157,9 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
             >
               <CardContent sx={{ p: 2 }}>
                 <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                  <Typography 
-                    variant="caption" 
-                    sx={{ 
+                  <Typography
+                    variant="caption"
+                    sx={{
                       color: offline ? '#f44336' : '#ffffff',
                       opacity: offline ? 1 : 0.7,
                       fontWeight: offline ? 500 : 400
@@ -167,7 +167,7 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
                   >
                     {formatMacAddress(sensor.sensor_mac)}
                   </Typography>
-                  
+
                   <Box display="flex" gap={0.5}>
                     <Tooltip title={`Battery: ${sensor.battery}mV (${getBatteryStatus(sensor.battery)})`}>
                       <Box>{getBatteryIcon(sensor.battery)}</Box>
@@ -180,9 +180,9 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
 
                 <Box display="flex" flexDirection="column" gap={1}>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Typography 
-                      variant="h4" 
-                      sx={{ 
+                    <Typography
+                      variant="h4"
+                      sx={{
                         color: offline ? 'rgba(255, 255, 255, 0.4)' : temperatureColor,
                         fontWeight: 300,
                         lineHeight: 1
@@ -190,9 +190,9 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
                     >
                       {offline ? '--' : sensor.temperature.toFixed(1)}
                     </Typography>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: offline ? 'rgba(255, 255, 255, 0.4)' : temperatureColor,
                         alignSelf: 'flex-start',
                         mt: 0.5
@@ -230,16 +230,16 @@ export const SensorGrid: React.FC<SensorGridProps> = ({
                   </Box>
 
                   <Box display="flex" justifyContent="space-between" alignItems="center" mt={1}>
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         color: offline ? '#f44336' : 'rgba(255, 255, 255, 0.5)',
                         fontSize: '0.7rem'
                       }}
                     >
                       {offline ? 'Offline' : getTimeSinceReading(sensor.timestamp)}
                     </Typography>
-                    
+
                     <Tooltip title="View Details">
                       <IconButton
                         size="small"

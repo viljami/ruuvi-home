@@ -52,7 +52,7 @@ export const useChartData = ({
   showPressureChart,
   formatMacAddress,
 }: UseChartDataProps): UseChartDataReturn => {
-  
+
   // Prepare main chart data (temperature and humidity)
   const mainChartData = useMemo(() => {
     if (!allHistoryData || !sensorsData) return null;

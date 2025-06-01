@@ -269,9 +269,9 @@ const Dashboard: React.FC = () => {
                 </ErrorBoundary>
               </Grid>
             ))}
-            
+
             {/* Show loading cards if we're loading and have no data */}
-            {isLoading && sensorData.length === 0 && 
+            {isLoading && sensorData.length === 0 &&
               Array.from({ length: 3 }).map((_, index) => (
                 <Grid
                   item

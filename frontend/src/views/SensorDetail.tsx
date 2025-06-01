@@ -71,10 +71,10 @@ const SensorDetail: React.FC = () => {
   // Filter historical data based on time range
   const filteredHistory = useMemo(() => {
     if (!history.data) return [];
-    
+
     const now = Date.now();
     let cutoffTime = now;
-    
+
     switch (timeRange) {
       case '-1h':
         cutoffTime = now - 60 * 60 * 1000;
@@ -91,7 +91,7 @@ const SensorDetail: React.FC = () => {
       default:
         return history.data;
     }
-    
+
     return history.data.filter(reading => reading.timestamp * 1000 >= cutoffTime);
   }, [history.data, timeRange]);
 

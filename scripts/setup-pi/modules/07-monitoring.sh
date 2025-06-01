@@ -28,24 +28,24 @@ verify_monitoring_scripts() {
     local context="$MODULE_CONTEXT"
     local required_scripts=(
         "$HEALTH_CHECK_SCRIPT"
-        "$MONITOR_SCRIPT" 
+        "$MONITOR_SCRIPT"
         "$MAINTENANCE_SCRIPT"
     )
-    
+
     log_info "$context" "Verifying monitoring scripts exist"
-    
+
     for script in "${required_scripts[@]}"; do
         if [ ! -f "$script" ]; then
             log_error "$context" "Required monitoring script not found: $script"
             log_error "$context" "Ensure file generation module has run successfully"
             return 1
         fi
-        
+
         if [ ! -x "$script" ]; then
             log_error "$context" "Script not executable: $script"
             return 1
         fi
-        
+
         # Basic syntax check
         local extension="${script##*.}"
         if [ "$extension" = "py" ]; then
@@ -60,7 +60,7 @@ verify_monitoring_scripts() {
             fi
         fi
     done
-    
+
     log_success "$context" "All monitoring scripts verified"
     return 0
 }
@@ -68,9 +68,9 @@ verify_monitoring_scripts() {
 # Configure system monitoring
 configure_system_monitoring() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Configuring system monitoring"
-    
+
     # Create system monitoring cron jobs
     cat > "$MONITORING_CRON" << EOF
 # Ruuvi Home system monitoring
@@ -89,17 +89,17 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # Weekly system update check on Sundays at 4 AM
 0 4 * * 0 root $MAINTENANCE_SCRIPT update >> $LOG_DIR/maintenance.log 2>&1
 EOF
-    
+
     # Set proper permissions
     chmod 644 "$MONITORING_CRON"
     chown root:root "$MONITORING_CRON"
-    
+
     # Restart cron service
     if ! systemctl restart cron; then
         log_error "$context" "Failed to restart cron service"
         return 1
     fi
-    
+
     log_success "$context" "System monitoring configured"
     return 0
 }
@@ -107,9 +107,9 @@ EOF
 # Configure log rotation for monitoring logs
 configure_monitoring_log_rotation() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Configuring monitoring log rotation"
-    
+
     # Create comprehensive logrotate configuration
     cat > /etc/logrotate.d/ruuvi-monitoring << EOF
 $LOG_DIR/health-check.log {
@@ -172,13 +172,13 @@ $LOG_DIR/webhook.log {
     create 644 $RUUVI_USER $RUUVI_USER
 }
 EOF
-    
+
     # Test logrotate configuration
     if ! logrotate -d /etc/logrotate.d/ruuvi-monitoring &>/dev/null; then
         log_error "$context" "Invalid logrotate configuration"
         return 1
     fi
-    
+
     log_success "$context" "Monitoring log rotation configured"
     return 0
 }
@@ -186,13 +186,13 @@ EOF
 # Set up alerting system
 setup_alerting_system() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Setting up alerting system"
-    
+
     # Create alert configuration file
     local alert_config="$PROJECT_DIR/config/alerts.conf"
     mkdir -p "$(dirname "$alert_config")"
-    
+
     cat > "$alert_config" << EOF
 # Ruuvi Home Alert Configuration
 # Thresholds for system monitoring alerts
@@ -219,10 +219,10 @@ MONITOR_LOG="$LOG_DIR/monitoring.log"
 # SMTP_SERVER=""
 # SMTP_PORT=""
 EOF
-    
+
     chown "$RUUVI_USER:$RUUVI_USER" "$alert_config"
     chmod 644 "$alert_config"
-    
+
     # Create alert handler script
     local alert_handler="$PROJECT_DIR/scripts/alert-handler.sh"
     cat > "$alert_handler" << EOF
@@ -243,10 +243,10 @@ log_alert() {
 send_alert() {
     local severity="\$1"
     local message="\$2"
-    
+
     # Log the alert
     log_alert "\$severity" "\$message"
-    
+
     # Add additional alerting mechanisms here (email, webhook, etc.)
     # Example: curl -X POST webhook_url -d "{\\"alert\\": \\"\$message\\"}"
 }
@@ -254,10 +254,10 @@ send_alert() {
 # Export functions for use by monitoring scripts
 export -f log_alert send_alert
 EOF
-    
+
     chmod +x "$alert_handler"
     chown "$RUUVI_USER:$RUUVI_USER" "$alert_handler"
-    
+
     log_success "$context" "Alerting system configured"
     return 0
 }
@@ -265,34 +265,34 @@ EOF
 # Install monitoring utilities
 install_monitoring_utilities() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Installing monitoring utilities"
-    
+
     # Install additional monitoring tools
     local monitoring_packages=("htop" "iotop" "nethogs" "ncdu" "tree")
     local missing_packages=()
-    
+
     for package in "${monitoring_packages[@]}"; do
         if ! dpkg -l | grep -q "^ii  $package "; then
             missing_packages+=("$package")
         fi
     done
-    
+
     if [ ${#missing_packages[@]} -gt 0 ]; then
         log_info "$context" "Installing monitoring packages: ${missing_packages[*]}"
-        
+
         export DEBIAN_FRONTEND=noninteractive
-        
+
         # Update package lists first
         if ! apt-get update -qq; then
             log_warn "$context" "Failed to update package lists, skipping monitoring utilities"
             return 0
         fi
-        
+
         # Try to install packages individually to avoid total failure
         local installed_packages=()
         local failed_packages=()
-        
+
         for package in "${missing_packages[@]}"; do
             if apt-get install -y -qq "$package"; then
                 installed_packages+=("$package")
@@ -302,27 +302,27 @@ install_monitoring_utilities() {
                 log_debug "$context" "Failed to install: $package"
             fi
         done
-        
+
         if [ ${#installed_packages[@]} -gt 0 ]; then
             log_success "$context" "Installed monitoring packages: ${installed_packages[*]}"
         fi
-        
+
         if [ ${#failed_packages[@]} -gt 0 ]; then
             log_warn "$context" "Failed to install some monitoring packages: ${failed_packages[*]}"
         fi
     else
         log_success "$context" "All monitoring packages already installed"
     fi
-    
+
     return 0
 }
 
 # Test monitoring functionality
 test_monitoring_functionality() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Testing monitoring functionality"
-    
+
     # Test health check script
     if [ -f "$HEALTH_CHECK_SCRIPT" ]; then
         log_debug "$context" "Testing health check script"
@@ -332,7 +332,7 @@ test_monitoring_functionality() {
             log_warn "$context" "Health check script test failed (services may not be running)"
         fi
     fi
-    
+
     # Test system monitor script
     if [ -f "$MONITOR_SCRIPT" ]; then
         log_debug "$context" "Testing system monitor script"
@@ -342,7 +342,7 @@ test_monitoring_functionality() {
             log_warn "$context" "System monitor script test failed"
         fi
     fi
-    
+
     # Test log file creation
     local test_log="$LOG_DIR/monitoring-test.log"
     if sudo -u "$RUUVI_USER" touch "$test_log"; then
@@ -352,46 +352,46 @@ test_monitoring_functionality() {
         log_error "$context" "Cannot create monitoring log files"
         return 1
     fi
-    
+
     return 0
 }
 
 # Validate monitoring system
 validate_monitoring_system() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Validating monitoring system"
-    
+
     # Check cron jobs are configured
     if [ ! -f "$MONITORING_CRON" ]; then
         log_error "$context" "Monitoring cron jobs not configured"
         return 1
     fi
-    
+
     # Verify cron service is running
     if ! systemctl is-active --quiet cron; then
         log_error "$context" "Cron service not running"
         return 1
     fi
-    
+
     # Check log directory permissions
     if [ ! -w "$LOG_DIR" ]; then
         log_error "$context" "Log directory not writable: $LOG_DIR"
         return 1
     fi
-    
+
     # Verify logrotate configuration
     if ! logrotate -d /etc/logrotate.d/ruuvi-monitoring &>/dev/null; then
         log_error "$context" "Logrotate configuration invalid"
         return 1
     fi
-    
+
     # Check disk space for logs (at least 500MB)
     local available_space=$(df "$LOG_DIR" | awk 'NR==2 {print int($4/1024)}')
     if [ "$available_space" -lt 500 ]; then
         log_warn "$context" "Low disk space for logs: ${available_space}MB available"
     fi
-    
+
     log_success "$context" "Monitoring system validation passed"
     return 0
 }
@@ -399,15 +399,15 @@ validate_monitoring_system() {
 # Show monitoring system status
 show_monitoring_status() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Monitoring system status"
-    
+
     echo ""
     echo "=== Monitoring System Configuration ==="
     echo "Health check interval: ${HEALTH_CHECK_INTERVAL}s"
     echo "Log directory: $LOG_DIR"
     echo "Alert configuration: $PROJECT_DIR/config/alerts.conf"
-    
+
     # Show monitoring schedule
     echo ""
     echo "=== Monitoring Schedule ==="
@@ -416,17 +416,17 @@ show_monitoring_status() {
             echo "  $line"
         done
     fi
-    
+
     # Show log file status
     echo ""
     echo "=== Log Files ==="
     if [ -d "$LOG_DIR" ]; then
         ls -la "$LOG_DIR"/*.log 2>/dev/null | tail -5 || echo "No log files found"
-        
+
         local total_log_size=$(du -sh "$LOG_DIR" 2>/dev/null | cut -f1)
         echo "Total log size: $total_log_size"
     fi
-    
+
     # Show available monitoring tools
     echo ""
     echo "=== Available Monitoring Tools ==="
@@ -438,7 +438,7 @@ show_monitoring_status() {
             echo "  ✗ $tool (not installed)"
         fi
     done
-    
+
     # Special check for Docker Compose (plugin vs standalone)
     if command -v docker-compose &>/dev/null; then
         echo "  ✓ docker-compose (standalone)"
@@ -463,20 +463,20 @@ setup_monitoring() {
         "validate_monitoring_system:Validate monitoring system"
         "show_monitoring_status:Show monitoring status"
     )
-    
+
     log_section "Monitoring Setup"
     log_info "$context" "Setting up monitoring system for user: $RUUVI_USER"
-    
+
     local step_num=1
     local total_steps=${#setup_steps[@]}
     local failed_steps=()
-    
+
     for step in "${setup_steps[@]}"; do
         local func_name="${step%:*}"
         local step_desc="${step#*:}"
-        
+
         log_step "$step_num" "$total_steps" "$step_desc"
-        
+
         if ! $func_name; then
             # Make monitoring utilities installation non-critical
             if [[ "$func_name" == "install_monitoring_utilities" ]]; then
@@ -485,15 +485,15 @@ setup_monitoring() {
                 failed_steps+=("$step_desc")
             fi
         fi
-        
+
         ((step_num++))
     done
-    
+
     if [ ${#failed_steps[@]} -gt 0 ]; then
         log_error "$context" "Monitoring setup failed at: ${failed_steps[*]}"
         return 1
     fi
-    
+
     log_success "$context" "Monitoring setup completed successfully"
     log_info "$context" "System monitoring active with health checks every ${HEALTH_CHECK_INTERVAL}s"
     return 0

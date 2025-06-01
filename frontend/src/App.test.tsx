@@ -49,7 +49,7 @@ describe("App Component", () => {
 
   test("renders without crashing", async () => {
     renderWithoutRouter(<App />);
-    
+
     // Should render the main app structure
     expect(screen.getByText("🏠 Ruuvi Home")).toBeInTheDocument();
     expect(screen.getByText("Sensor Monitoring Dashboard")).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("App Component", () => {
 
   test("displays navigation elements", async () => {
     renderWithoutRouter(<App />);
-    
+
     // Check for navigation buttons
     expect(screen.getByRole("button", { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /dashboard/i })).toBeInTheDocument();
@@ -65,7 +65,7 @@ describe("App Component", () => {
 
   test("renders overview by default", async () => {
     renderWithoutRouter(<App />);
-    
+
     // Should show overview by default (route: /)
     await waitFor(() => {
       expect(screen.getByTestId("overview")).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("App Component", () => {
 
   test("has proper semantic structure", async () => {
     renderWithoutRouter(<App />);
-    
+
     // Check for proper semantic HTML
     expect(screen.getByRole("banner")).toBeInTheDocument(); // header
     expect(screen.getByRole("main")).toBeInTheDocument(); // main content
@@ -85,21 +85,21 @@ describe("App Component", () => {
 
   test("contains error boundary", async () => {
     renderWithoutRouter(<App />);
-    
+
     // The app should render without errors, indicating error boundary is working
     expect(screen.getByText("🏠 Ruuvi Home")).toBeInTheDocument();
   });
 
   test("shows loading state initially", async () => {
     renderWithoutRouter(<App />);
-    
+
     // App should render immediately (no loading spinner for main app)
     expect(screen.getByText("🏠 Ruuvi Home")).toBeInTheDocument();
   });
 
   test("handles routing properly", async () => {
     const { rerender } = renderWithoutRouter(<App />);
-    
+
     // Should handle different routes without crashing
     expect(() => rerender(<App />)).not.toThrow();
   });
@@ -108,7 +108,7 @@ describe("App Component", () => {
 describe("App Integration", () => {
   test("provides query client context", async () => {
     renderWithoutRouter(<App />);
-    
+
     // If React Query context is provided, components should render
     // The overview component should be able to use queries
     await waitFor(() => {
@@ -118,7 +118,7 @@ describe("App Integration", () => {
 
   test("provides router context", async () => {
     renderWithoutRouter(<App />);
-    
+
     // If Router context is provided, navigation should work
     expect(screen.getByRole("button", { name: /overview/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /dashboard/i })).toBeInTheDocument();

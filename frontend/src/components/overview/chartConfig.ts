@@ -1,7 +1,7 @@
 // Chart configuration constants for Overview dashboard
 export const SENSOR_COLORS = [
   '#3b82f6', // blue
-  '#ef4444', // red  
+  '#ef4444', // red
   '#10b981', // green
   '#f59e0b', // yellow
   '#8b5cf6', // purple

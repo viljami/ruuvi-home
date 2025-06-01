@@ -2,12 +2,12 @@ services:
   # TimescaleDB - expose port for development
   timescaledb:
     ports:
-      - "5432:5432" # Expose for development tools
+      - "5432:5432"  # Expose for development tools
 
   # Mosquitto - expose port for development
   mosquitto:
     ports:
-      - "1883:1883" # Expose for development
+      - "1883:1883"  # Expose for development
 
   # MQTT Reader - build locally for development
   mqtt-reader:

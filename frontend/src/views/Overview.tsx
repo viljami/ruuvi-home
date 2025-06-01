@@ -366,8 +366,8 @@ const Overview: React.FC = () => {
   const lowSignalSensors = sensorData.filter(s => s.rssi < -80);
 
   return (
-    <Box 
-      sx={{ 
+    <Box
+      sx={{
         minHeight: '100vh',
         bgcolor: '#0a0a0a',
         color: '#ffffff',
@@ -375,10 +375,10 @@ const Overview: React.FC = () => {
       }}
     >
       {/* Ambient Header Bar */}
-      <AppBar 
-        position="static" 
+      <AppBar
+        position="static"
         elevation={0}
-        sx={{ 
+        sx={{
           bgcolor: 'transparent',
           borderBottom: '1px solid rgba(255,255,255,0.05)'
         }}
@@ -389,7 +389,7 @@ const Overview: React.FC = () => {
               edge="start"
               color="inherit"
               onClick={() => setDrawerOpen(true)}
-              sx={{ 
+              sx={{
                 mr: 2,
                 opacity: 0.6,
                 '&:hover': { opacity: 1 }
@@ -397,10 +397,10 @@ const Overview: React.FC = () => {
             >
               <MenuIcon />
             </IconButton>
-            <Typography 
-              variant="h6" 
-              component="h1" 
-              sx={{ 
+            <Typography
+              variant="h6"
+              component="h1"
+              sx={{
                 opacity: 0.4,
                 fontWeight: 300,
                 fontSize: '1rem',
@@ -410,7 +410,7 @@ const Overview: React.FC = () => {
               Ruuvi Home
             </Typography>
           </Box>
-          
+
           <Box display="flex" alignItems="center" gap={1}>
             <Tooltip title="Refresh Data">
               <IconButton
@@ -418,7 +418,7 @@ const Overview: React.FC = () => {
                 disabled={dashboardLoading}
                 color="inherit"
                 size="small"
-                sx={{ 
+                sx={{
                   opacity: 0.6,
                   '&:hover': { opacity: 1 }
                 }}
@@ -467,18 +467,18 @@ const Overview: React.FC = () => {
 
       {/* Ambient Warning Indicators */}
       {(lowBatterySensors.length > 0 || lowSignalSensors.length > 0 || dashboardError || historyError) && (
-        <Box sx={{ 
-          position: 'fixed', 
-          top: 80, 
-          right: 16, 
+        <Box sx={{
+          position: 'fixed',
+          top: 80,
+          right: 16,
           zIndex: 1000,
           maxWidth: 300
         }}>
           {(dashboardError || historyError) && (
-            <Alert 
-              severity="error" 
+            <Alert
+              severity="error"
               variant="filled"
-              sx={{ 
+              sx={{
                 mb: 1,
                 bgcolor: alpha('#d32f2f', 0.8),
                 '& .MuiAlert-message': { fontSize: '0.875rem' }
@@ -487,13 +487,13 @@ const Overview: React.FC = () => {
               Connection issue
             </Alert>
           )}
-          
+
           {lowBatterySensors.length > 0 && (
-            <Alert 
-              severity="warning" 
+            <Alert
+              severity="warning"
               variant="filled"
               icon={<BatteryAlert />}
-              sx={{ 
+              sx={{
                 mb: 1,
                 bgcolor: alpha('#ed6c02', 0.8),
                 '& .MuiAlert-message': { fontSize: '0.875rem' }
@@ -502,13 +502,13 @@ const Overview: React.FC = () => {
               {lowBatterySensors.length} sensors low battery
             </Alert>
           )}
-          
+
           {lowSignalSensors.length > 0 && (
-            <Alert 
-              severity="warning" 
+            <Alert
+              severity="warning"
               variant="filled"
               icon={<SignalWifiStatusbarConnectedNoInternet4 />}
-              sx={{ 
+              sx={{
                 mb: 1,
                 bgcolor: alpha('#ed6c02', 0.8),
                 '& .MuiAlert-message': { fontSize: '0.875rem' }
@@ -521,17 +521,17 @@ const Overview: React.FC = () => {
       )}
 
       {/* Ambient Controls */}
-      <Box sx={{ 
-        position: 'fixed', 
-        bottom: 20, 
-        left: 20, 
+      <Box sx={{
+        position: 'fixed',
+        bottom: 20,
+        left: 20,
         zIndex: 1000,
         display: 'flex',
         gap: 2,
         flexWrap: 'wrap'
       }}>
-        <Card sx={{ 
-          bgcolor: alpha('#1a1a1a', 0.9), 
+        <Card sx={{
+          bgcolor: alpha('#1a1a1a', 0.9),
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
@@ -542,7 +542,7 @@ const Overview: React.FC = () => {
                 value={timeRange}
                 label="Time Range"
                 onChange={(e) => setTimeRange(e.target.value)}
-                sx={{ 
+                sx={{
                   color: '#ffffff',
                   '& .MuiOutlinedInput-notchedOutline': {
                     borderColor: 'rgba(255,255,255,0.3)'
@@ -562,8 +562,8 @@ const Overview: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card sx={{ 
-          bgcolor: alpha('#1a1a1a', 0.9), 
+        <Card sx={{
+          bgcolor: alpha('#1a1a1a', 0.9),
           backdropFilter: 'blur(10px)',
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
@@ -593,7 +593,7 @@ const Overview: React.FC = () => {
       {/* Main Chart - Full Screen */}
       <ErrorBoundary
         fallback={
-          <Box sx={{ 
+          <Box sx={{
             height: 'calc(100vh - 120px)',
             display: 'flex',
             alignItems: 'center',
@@ -609,7 +609,7 @@ const Overview: React.FC = () => {
           </Box>
         }
       >
-        <Box sx={{ 
+        <Box sx={{
           height: 'calc(100vh - 120px)',
           p: 2,
           bgcolor: '#0a0a0a'
@@ -691,10 +691,10 @@ const Overview: React.FC = () => {
       )}
 
       {/* Sensor Summary - Scrollable Overlay */}
-      <Box sx={{ 
-        position: 'fixed', 
-        top: 120, 
-        left: 16, 
+      <Box sx={{
+        position: 'fixed',
+        top: 120,
+        left: 16,
         maxHeight: 'calc(100vh - 200px)',
         maxWidth: 250,
         overflowY: 'auto',
@@ -704,8 +704,8 @@ const Overview: React.FC = () => {
         transition: 'opacity 0.3s ease'
       }}>
         {sensorData.map(sensor => (
-          <Card key={sensor.sensor_mac} sx={{ 
-            mb: 1, 
+          <Card key={sensor.sensor_mac} sx={{
+            mb: 1,
             bgcolor: alpha('#1a1a1a', 0.9),
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255,255,255,0.1)'

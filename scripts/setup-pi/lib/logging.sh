@@ -28,7 +28,7 @@ should_log() {
     local message_level="$1"
     local current_level_num=$(get_log_level_num)
     local message_level_num="${LOG_LEVELS[$message_level]:-1}"
-    
+
     [ "$message_level_num" -ge "$current_level_num" ]
 }
 
@@ -38,7 +38,7 @@ format_log_message() {
     local context="$2"
     local action="$3"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    
+
     echo "[$timestamp] [$level] [$context] $action"
 }
 
@@ -48,10 +48,10 @@ log_message() {
     local context="$2"
     local action="$3"
     local color="$4"
-    
+
     if should_log "$level"; then
         local message=$(format_log_message "$level" "$context" "$action")
-        
+
         if [ -t 1 ] && [ -n "$color" ]; then
             echo -e "${color}${message}${COLOR_NC:-\033[0m}"
         else
@@ -95,7 +95,7 @@ log_step() {
     local description="$3"
     local context="SETUP"
     local action="Step $step_num/$total_steps: $description"
-    
+
     log_info "$context" "$action"
 }
 
@@ -104,7 +104,7 @@ log_section() {
     local section_name="$1"
     local context="SETUP"
     local action="=== $section_name ==="
-    
+
     if [ -t 1 ]; then
         echo -e "\n${COLOR_GREEN:-\033[0;32m}${action}${COLOR_NC:-\033[0m}\n"
     else
@@ -132,10 +132,10 @@ log_to_file() {
     local context="$2"
     local action="$3"
     local log_file="${4:-/var/log/ruuvi-home/setup.log}"
-    
+
     # Ensure log directory exists
     mkdir -p "$(dirname "$log_file")" 2>/dev/null || true
-    
+
     # Log to console
     case "$level" in
         "debug") log_debug "$context" "$action" ;;
@@ -143,7 +143,7 @@ log_to_file() {
         "warn") log_warn "$context" "$action" ;;
         "error") log_error "$context" "$action" ;;
     esac
-    
+
     # Log to file (no colors)
     if [ -w "$(dirname "$log_file")" ] 2>/dev/null || [ -w "$log_file" ] 2>/dev/null; then
         format_log_message "$level" "$context" "$action" >> "$log_file"
@@ -155,7 +155,7 @@ log_validation() {
     local check_name="$1"
     local result="$2"
     local context="VALIDATION"
-    
+
     if [ "$result" = "pass" ]; then
         log_success "$context" "$check_name"
     else

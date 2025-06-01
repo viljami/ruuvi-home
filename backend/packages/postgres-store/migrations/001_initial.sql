@@ -90,19 +90,19 @@ RETURNS TABLE(
 ) AS $$
 BEGIN
     RETURN QUERY
-    SELECT 
+    SELECT
         'sensor_data'::TEXT,
         ROUND(pg_total_relation_size('sensor_data') / 1024.0 / 1024.0, 2) AS raw_size_mb,
         ROUND(
-            CASE 
-                WHEN compressed_chunk_size.compressed_size IS NOT NULL 
+            CASE
+                WHEN compressed_chunk_size.compressed_size IS NOT NULL
                 THEN compressed_chunk_size.compressed_size / 1024.0 / 1024.0
                 ELSE pg_total_relation_size('sensor_data') / 1024.0 / 1024.0
             END, 2
         ) AS compressed_size_mb,
         ROUND(
-            CASE 
-                WHEN compressed_chunk_size.compressed_size IS NOT NULL 
+            CASE
+                WHEN compressed_chunk_size.compressed_size IS NOT NULL
                 THEN pg_total_relation_size('sensor_data')::NUMERIC / compressed_chunk_size.compressed_size
                 ELSE 1.0
             END, 2
@@ -112,7 +112,7 @@ BEGIN
         (SELECT MAX(timestamp) FROM sensor_data) AS newest_data
     FROM (
         SELECT COALESCE(SUM(compressed_total_bytes), 0) AS compressed_size
-        FROM timescaledb_information.compressed_chunk_stats 
+        FROM timescaledb_information.compressed_chunk_stats
         WHERE hypertable_name = 'sensor_data'
     ) compressed_chunk_size;
 END;
@@ -142,10 +142,10 @@ BEGIN
     -- Calculate readings per sensor per year
     readings_per_sensor_per_year := (365 * 24 * 3600) / reading_interval_seconds;
     total_readings_count := readings_per_sensor_per_year * sensor_count * retention_years;
-    
+
     RETURN QUERY
-    SELECT 
-        FORMAT('%s sensors, %s sec intervals, %s years', 
+    SELECT
+        FORMAT('%s sensors, %s sec intervals, %s years',
                sensor_count, reading_interval_seconds, retention_years)::TEXT AS scenario,
         total_readings_count AS total_readings,
         ROUND((total_readings_count * bytes_per_reading) / 1024.0 / 1024.0 / 1024.0, 2) AS uncompressed_size_gb,
@@ -181,17 +181,17 @@ DECLARE
     size_30_days_ago_mb NUMERIC;
 BEGIN
     start_time := NOW() - (days_back || ' days')::INTERVAL;
-    
+
     -- Get current storage size
-    SELECT raw_size_mb INTO current_size_mb 
-    FROM get_storage_stats() 
+    SELECT raw_size_mb INTO current_size_mb
+    FROM get_storage_stats()
     LIMIT 1;
-    
+
     -- Estimate size 30 days ago (this is approximate)
     size_30_days_ago_mb := COALESCE(current_size_mb * 0.9, 0); -- Rough estimate
-    
+
     RETURN QUERY
-    SELECT 
+    SELECT
         days_back AS period_days,
         COUNT(*) AS readings_added,
         ROUND(COUNT(*)::NUMERIC / GREATEST(days_back, 1), 2) AS readings_per_day,
@@ -204,11 +204,11 @@ $$ LANGUAGE plpgsql;
 
 -- Create a view for easy storage monitoring
 CREATE OR REPLACE VIEW storage_monitoring AS
-SELECT 
+SELECT
     *,
-    CASE 
-        WHEN compressed_size_mb > 0 AND raw_size_mb > 0 
+    CASE
+        WHEN compressed_size_mb > 0 AND raw_size_mb > 0
         THEN ROUND((raw_size_mb - compressed_size_mb) / raw_size_mb * 100, 1)
-        ELSE 0 
+        ELSE 0
     END AS compression_savings_percent
 FROM get_storage_stats();

@@ -1,7 +1,8 @@
-import pytest
 import os
 import sys
 from unittest.mock import MagicMock
+
+import pytest
 
 # Add the parent directory to the path so we can import the simulator module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

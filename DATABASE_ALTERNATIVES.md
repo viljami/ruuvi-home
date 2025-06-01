@@ -159,8 +159,8 @@ let hourly_data = store.get_time_bucketed_data(
 
 // Use pre-computed continuous aggregates for better performance
 let daily_stats = store.get_daily_aggregates(
-    "AA:BB:CC:DD:EE:FF", 
-    start_time, 
+    "AA:BB:CC:DD:EE:FF",
+    start_time,
     end_time
 ).await?;
 
@@ -174,7 +174,7 @@ while let Ok(notification) = listener.recv().await {
 // Time bucket query with flexible intervals
 let temp_trend = sqlx::query!(
     r#"
-    SELECT 
+    SELECT
         time_bucket('15 minutes', timestamp) AS bucket,
         AVG(temperature) AS avg_temp
     FROM sensor_data

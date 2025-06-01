@@ -90,18 +90,18 @@ run_mqtt_simulator_tests() {
     else
         test_command="$test_command -v"
     fi
-    
+
     # Add coverage reporting
     test_command="$test_command --cov=simulator --cov-report=term"
 
     # Run the tests in Docker
     cd "$PROJECT_ROOT"
     docker-compose -f docker-compose-test.yaml run --rm mqtt-simulator-tests $test_command
-    
+
     # Run linting checks
     echo -e "\n${YELLOW}Running MQTT simulator linting checks...${NC}"
     docker-compose -f docker-compose-test.yaml run --rm mqtt-simulator-lint
-    
+
     # Cleanup if requested
     if [[ "$CLEANUP" == true ]]; then
         echo -e "\n${YELLOW}Cleaning up test containers...${NC}"

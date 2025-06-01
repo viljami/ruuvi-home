@@ -28,10 +28,10 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
   subtitle = 'Sensor Monitoring Dashboard',
 }) => {
   return (
-    <AppBar 
-      position="static" 
+    <AppBar
+      position="static"
       elevation={0}
-      sx={{ 
+      sx={{
         bgcolor: 'transparent',
         borderBottom: '1px solid rgba(255,255,255,0.05)'
       }}
@@ -42,7 +42,7 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
             edge="start"
             color="inherit"
             onClick={onMenuClick}
-            sx={{ 
+            sx={{
               mr: 2,
               opacity: 0.6,
               '&:hover': { opacity: 1 },
@@ -52,10 +52,10 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
           >
             <MenuIcon />
           </IconButton>
-          <Typography 
-            variant="h6" 
-            component="h1" 
-            sx={{ 
+          <Typography
+            variant="h6"
+            component="h1"
+            sx={{
               opacity: 0.4,
               fontWeight: 300,
               fontSize: '1rem',
@@ -66,11 +66,11 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
             {title}
           </Typography>
         </Box>
-        
+
         <Box display="flex" alignItems="center" gap={2}>
-          <Typography 
-            variant="body2" 
-            sx={{ 
+          <Typography
+            variant="body2"
+            sx={{
               opacity: 0.6,
               fontSize: '0.8rem',
               display: { xs: 'none', sm: 'block' }
@@ -78,22 +78,22 @@ export const OverviewHeader: React.FC<OverviewHeaderProps> = ({
           >
             {subtitle}
           </Typography>
-          
+
           <Tooltip title="Refresh Data">
             <IconButton
               onClick={onRefreshClick}
               disabled={isLoading}
               color="inherit"
               size="small"
-              sx={{ 
+              sx={{
                 opacity: isLoading ? 0.3 : 0.6,
                 '&:hover': { opacity: 1 },
                 transition: 'opacity 0.2s ease'
               }}
               aria-label="Refresh sensor data"
             >
-              <Refresh 
-                fontSize="small" 
+              <Refresh
+                fontSize="small"
                 sx={{
                   animation: isLoading ? 'spin 1s linear infinite' : 'none',
                   '@keyframes spin': {

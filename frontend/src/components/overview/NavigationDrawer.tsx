@@ -78,9 +78,9 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
       }}
     >
       <Box sx={{ p: 2 }}>
-        <Typography 
-          variant="h6" 
-          sx={{ 
+        <Typography
+          variant="h6"
+          sx={{
             color: '#ffffff',
             fontWeight: 300,
             opacity: 0.9
@@ -88,9 +88,9 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
         >
           🏠 Ruuvi Home
         </Typography>
-        <Typography 
-          variant="caption" 
-          sx={{ 
+        <Typography
+          variant="caption"
+          sx={{
             color: '#ffffff',
             opacity: 0.6,
             display: 'block',
@@ -100,17 +100,17 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           Sensor Monitoring
         </Typography>
       </Box>
-      
+
       <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
-      
+
       <List sx={{ pt: 1 }}>
         {navigationItems.map((item) => {
           const isActive = location.pathname === item.path;
-          
+
           return (
-            <ListItem 
+            <ListItem
               key={item.path}
-              button 
+              button
               onClick={() => handleNavigation(item.path)}
               sx={{
                 mx: 1,
@@ -118,15 +118,15 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
                 mb: 0.5,
                 bgcolor: isActive ? 'rgba(144, 202, 249, 0.12)' : 'transparent',
                 '&:hover': {
-                  bgcolor: isActive 
-                    ? 'rgba(144, 202, 249, 0.2)' 
+                  bgcolor: isActive
+                    ? 'rgba(144, 202, 249, 0.2)'
                     : 'rgba(255, 255, 255, 0.08)'
                 },
                 transition: 'background-color 0.2s ease',
               }}
             >
-              <ListItemIcon 
-                sx={{ 
+              <ListItemIcon
+                sx={{
                   color: isActive ? '#90caf9' : '#ffffff',
                   opacity: isActive ? 1 : 0.7,
                   minWidth: 40
@@ -134,7 +134,7 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
               >
                 {item.icon}
               </ListItemIcon>
-              <ListItemText 
+              <ListItemText
                 primary={item.text}
                 sx={{
                   '& .MuiListItemText-primary': {
@@ -149,13 +149,13 @@ export const NavigationDrawer: React.FC<NavigationDrawerProps> = ({
           );
         })}
       </List>
-      
+
       <Box sx={{ flexGrow: 1 }} />
-      
+
       <Box sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-        <Typography 
-          variant="caption" 
-          sx={{ 
+        <Typography
+          variant="caption"
+          sx={{
             color: '#ffffff',
             opacity: 0.5,
             display: 'block'

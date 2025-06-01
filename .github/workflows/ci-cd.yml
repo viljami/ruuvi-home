@@ -8,6 +8,12 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+  actions: read
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -17,7 +23,7 @@ jobs:
   test-backend:
     runs-on: ubuntu-latest
     name: Test Backend
-    
+
     services:
       postgres:
         image: timescale/timescaledb:latest-pg15
@@ -100,21 +106,10 @@ jobs:
           cd docker/mqtt-simulator
           make deps
 
-      - name: Auto-format Python code
+      - name: Check Python code formatting
         run: |
           cd docker/mqtt-simulator
-          make fmt
-
-      - name: Commit formatting changes
-        if: github.event_name == 'push'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add docker/mqtt-simulator/
-          if ! git diff --cached --exit-code; then
-            git commit -m "Auto-format Python code [skip ci]"
-            git push
-          fi
+          make fmt-check
 
       - name: Run code quality checks
         run: |
@@ -156,7 +151,7 @@ jobs:
         run: |
           # Run MQTT simulator tests
           docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-tests
-          
+
           # Run linting tests
           docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-lint
 
@@ -214,8 +209,13 @@ jobs:
         continue-on-error: true
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
-          file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
+          context: >-
+            ${{ matrix.service == 'mqtt-simulator' &&
+            './docker/mqtt-simulator' || '.' }}
+          file: >-
+            ${{ matrix.service == 'mqtt-simulator' &&
+            './docker/mqtt-simulator/Dockerfile' ||
+            format('docker/{0}.Dockerfile', matrix.service) }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -236,8 +236,13 @@ jobs:
         continue-on-error: true
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
-          file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
+          context: >-
+            ${{ matrix.service == 'mqtt-simulator' &&
+            './docker/mqtt-simulator' || '.' }}
+          file: >-
+            ${{ matrix.service == 'mqtt-simulator' &&
+            './docker/mqtt-simulator/Dockerfile' ||
+            format('docker/{0}.Dockerfile', matrix.service) }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -256,8 +261,13 @@ jobs:
         if: steps.build_attempt_1.outcome == 'failure' && steps.build_attempt_2.outcome == 'failure'
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
-          file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
+          context: >-
+            ${{ matrix.service == 'mqtt-simulator' &&
+            './docker/mqtt-simulator' || '.' }}
+          file: >-
+            ${{ matrix.service == 'mqtt-simulator' &&
+            './docker/mqtt-simulator/Dockerfile' ||
+            format('docker/{0}.Dockerfile', matrix.service) }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}

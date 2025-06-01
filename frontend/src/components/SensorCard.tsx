@@ -61,7 +61,7 @@ const SensorCard: React.FC<SensorCardProps> = ({
   // Handle error state
   if (error && !sensor) {
     const isNetworkError = error?.status === 0 || error?.message?.includes('network') || error?.message?.includes('fetch');
-    
+
     return (
       <Card
         sx={{
@@ -83,7 +83,7 @@ const SensorCard: React.FC<SensorCardProps> = ({
               {isNetworkError ? 'Connection Error' : 'Sensor Error'}
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-              {isNetworkError 
+              {isNetworkError
                 ? 'Unable to connect to sensor'
                 : error?.message || 'Failed to load sensor data'
               }
@@ -205,8 +205,8 @@ const SensorCard: React.FC<SensorCardProps> = ({
       )}
 
       {error && (
-        <Alert 
-          severity="warning" 
+        <Alert
+          severity="warning"
           sx={{ m: 1, mb: 0 }}
           action={
             onRefresh && (

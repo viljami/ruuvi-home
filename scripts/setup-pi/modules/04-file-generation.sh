@@ -20,11 +20,11 @@ source "$LIB_DIR/validation.sh"
 generate_deploy_webhook_script() {
     local context="$MODULE_CONTEXT"
     local script_path="$PROJECT_DIR/scripts/deploy-webhook.py"
-    
+
     log_info "$context" "Generating deploy webhook script"
-    
+
     mkdir -p "$(dirname "$script_path")"
-    
+
     cat > "$script_path" << EOF
 #!/usr/bin/env python3
 """
@@ -67,14 +67,14 @@ def ensure_ssl_certificates():
     """Ensure SSL certificates exist, generate self-signed if needed"""
     cert_path = Path(WEBHOOK_CERT_PATH)
     key_path = Path(WEBHOOK_KEY_PATH)
-    
+
     if not cert_path.exists() or not key_path.exists():
         log_webhook("SSL certificates not found, generating self-signed certificates...")
-        
+
         # Create SSL directory
         ssl_dir = cert_path.parent
         ssl_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Generate self-signed certificate
         import subprocess
         try:
@@ -85,18 +85,18 @@ def ensure_ssl_certificates():
             ], check=True, capture_output=True)
             log_webhook(f"Generated self-signed certificate: {cert_path}")
             log_webhook(f"Generated private key: {key_path}")
-            
+
             # Set proper permissions
             os.chmod(str(key_path), 0o600)
             os.chmod(str(cert_path), 0o644)
-            
+
         except subprocess.CalledProcessError as e:
             log_webhook(f"Failed to generate SSL certificates: {e}")
             return False
         except FileNotFoundError:
             log_webhook("OpenSSL not found, please install: sudo apt install openssl")
             return False
-    
+
     return True
 
 class WebhookHandler(BaseHTTPRequestHandler):
@@ -104,9 +104,9 @@ class WebhookHandler(BaseHTTPRequestHandler):
         try:
             content_length = int(self.headers['Content-Length'])
             payload = self.rfile.read(content_length)
-            
+
             log_webhook(f"Received webhook payload from {self.client_address[0]}")
-            
+
             # Verify signature
             signature = self.headers.get('X-Hub-Signature-256')
             if not self.verify_signature(payload, signature):
@@ -115,15 +115,15 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b'Unauthorized')
                 return
-            
+
             # Parse payload
             data = json.loads(payload.decode('utf-8'))
-            
+
             # Log the event
             event_type = self.headers.get('X-GitHub-Event', 'unknown')
             repository = data.get('repository', {}).get('full_name', 'unknown')
             log_webhook(f"GitHub {event_type} event from {repository}")
-            
+
             # Handle push events to main branch
             if data.get('ref') == 'refs/heads/main':
                 log_webhook("Triggering deployment for main branch push")
@@ -137,7 +137,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'No action taken - not main branch')
-                
+
         except json.JSONDecodeError as e:
             log_webhook(f"Invalid JSON payload: {e}")
             self.send_response(400)
@@ -159,19 +159,19 @@ class WebhookHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         """Override to use our logging function"""
         log_webhook(f"{self.client_address[0]} - {format % args}")
-    
+
     def verify_signature(self, payload, signature):
         if not signature or not WEBHOOK_SECRET:
             return False
-        
+
         expected = 'sha256=' + hmac.new(
             WEBHOOK_SECRET.encode(),
             payload,
             hashlib.sha256
         ).hexdigest()
-        
+
         return hmac.compare_digest(signature, expected)
-    
+
     def deploy(self):
         try:
             log_webhook("Starting deployment process...")
@@ -196,37 +196,37 @@ if __name__ == '__main__':
             if not ensure_ssl_certificates():
                 log_webhook("SSL setup failed, falling back to HTTP")
                 WEBHOOK_ENABLE_HTTPS = False
-        
+
         # Create server
         server = HTTPServer(('0.0.0.0', WEBHOOK_PORT), WebhookHandler)
-        
+
         if WEBHOOK_ENABLE_HTTPS:
             # Configure SSL context
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.load_cert_chain(WEBHOOK_CERT_PATH, WEBHOOK_KEY_PATH)
-            
+
             # Security settings
             context.set_ciphers('ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS')
             context.minimum_version = ssl.TLSVersion.TLSv1_2
-            
+
             server.socket = context.wrap_socket(server.socket, server_side=True)
             protocol = "HTTPS"
         else:
             protocol = "HTTP"
-        
+
         log_webhook(f"Webhook server starting on {protocol}://0.0.0.0:{WEBHOOK_PORT}")
         log_webhook(f"Certificate path: {WEBHOOK_CERT_PATH if WEBHOOK_ENABLE_HTTPS else 'N/A'}")
         log_webhook(f"Log file: {LOG_FILE}")
-        
+
         server.serve_forever()
-        
+
     except KeyboardInterrupt:
         log_webhook("Webhook server stopped by user")
     except Exception as e:
         log_webhook(f"Webhook server error: {e}")
         sys.exit(1)
 EOF
-    
+
     chmod +x "$script_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
     log_success "$context" "Deploy webhook script generated"
@@ -236,11 +236,11 @@ EOF
 generate_deploy_script() {
     local context="$MODULE_CONTEXT"
     local script_path="$PROJECT_DIR/scripts/deploy.sh"
-    
+
     log_info "$context" "Generating deployment script"
-    
+
     mkdir -p "$(dirname "$script_path")"
-    
+
     cat > "$script_path" << EOF
 #!/bin/bash
 # Ruuvi Home Deployment Script
@@ -265,7 +265,7 @@ git reset --hard origin/main
 if [ ! -f "frontend/public/index.html" ]; then
     log_deployment "Creating missing frontend files..."
     mkdir -p frontend/public
-    
+
     # Create basic index.html if missing
     cat > frontend/public/index.html << 'HTMLEOF'
 <!DOCTYPE html>
@@ -284,7 +284,7 @@ if [ ! -f "frontend/public/index.html" ]; then
   </body>
 </html>
 HTMLEOF
-    
+
     # Create basic manifest.json if missing
     if [ ! -f "frontend/public/manifest.json" ]; then
         cat > frontend/public/manifest.json << 'JSONEOF'
@@ -300,7 +300,7 @@ HTMLEOF
 }
 JSONEOF
     fi
-    
+
     log_deployment "Frontend files created"
 fi
 
@@ -333,7 +333,7 @@ fi
 
 log_deployment "Deployment completed successfully"
 EOF
-    
+
     chmod +x "$script_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
     log_success "$context" "Deployment script generated"
@@ -343,11 +343,11 @@ EOF
 generate_backup_script() {
     local context="$MODULE_CONTEXT"
     local script_path="$PROJECT_DIR/scripts/backup.sh"
-    
+
     log_info "$context" "Generating backup script"
-    
+
     mkdir -p "$(dirname "$script_path")"
-    
+
     cat > "$script_path" << EOF
 #!/bin/bash
 # Ruuvi Home Backup Script
@@ -381,7 +381,7 @@ find "\$BACKUP_DIR" -name "ruuvi_backup_*.sql.gz" -mtime +30 -delete
 
 log_backup "Backup completed: \$BACKUP_FILE"
 EOF
-    
+
     chmod +x "$script_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
     log_success "$context" "Backup script generated"
@@ -391,9 +391,9 @@ EOF
 generate_env_file() {
     local context="$MODULE_CONTEXT"
     local env_path="$PROJECT_DIR/.env"
-    
+
     log_info "$context" "Generating environment file"
-    
+
     cat > "$env_path" << EOF
 # Ruuvi Home Environment Configuration
 # Generated by setup script
@@ -455,7 +455,7 @@ IMAGE_TAG=${IMAGE_TAG:-latest}
 PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:3000}
 CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN:-*}
 EOF
-    
+
     chmod 600 "$env_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$env_path"
     log_success "$context" "Environment file generated"
@@ -464,19 +464,19 @@ EOF
 # Generate systemd service files
 generate_systemd_services() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Generating systemd service files"
-    
+
     # Determine which compose file to use
     local compose_file="${DOCKER_COMPOSE_FILE:-docker-compose.yaml}"
     log_info "$context" "Using compose file: $compose_file"
     log_info "$context" "Deployment mode: ${DEPLOYMENT_MODE:-local}"
-    
+
     # Detect Docker Compose command and get full path
     local docker_compose_start_cmd
     local docker_compose_stop_cmd
     local docker_compose_pull_cmd
-    
+
     if command -v docker-compose &> /dev/null; then
         local compose_path=$(command -v docker-compose)
         docker_compose_start_cmd="$compose_path -f $compose_file up -d"
@@ -493,13 +493,13 @@ generate_systemd_services() {
         log_error "$context" "Neither docker-compose nor docker compose found"
         return 1
     fi
-    
+
     # For registry mode, add image pull step
     if [ "$DEPLOYMENT_MODE" = "registry" ]; then
         docker_compose_start_cmd="$docker_compose_pull_cmd && $docker_compose_start_cmd"
         log_info "$context" "Registry mode: Will pull images before starting services"
     fi
-    
+
     # Ruuvi Home main service
     cat > "/etc/systemd/system/ruuvi-home.service" << EOF
 [Unit]
@@ -520,7 +520,7 @@ Group=${RUUVI_USER}
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     # Webhook service
     cat > "/etc/systemd/system/ruuvi-webhook.service" << EOF
 [Unit]
@@ -539,7 +539,7 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
-    
+
     chmod 644 "/etc/systemd/system/ruuvi-home.service"
     chmod 644 "/etc/systemd/system/ruuvi-webhook.service"
     log_success "$context" "Systemd services generated"
@@ -549,11 +549,11 @@ EOF
 generate_health_check_script() {
     local context="$MODULE_CONTEXT"
     local script_path="$PROJECT_DIR/scripts/health-check.py"
-    
+
     log_info "$context" "Generating health check script"
-    
+
     mkdir -p "$(dirname "$script_path")"
-    
+
     cat > "$script_path" << EOF
 #!/usr/bin/env python3
 """
@@ -582,17 +582,17 @@ def check_docker_services():
     try:
         # Try docker compose first, then docker-compose
         try:
-            result = subprocess.run(['docker', 'compose', 'ps', '--format', 'json'], 
+            result = subprocess.run(['docker', 'compose', 'ps', '--format', 'json'],
                                   cwd=PROJECT_DIR, capture_output=True, text=True)
         except FileNotFoundError:
-            result = subprocess.run(['docker-compose', 'ps', '--format', 'json'], 
+            result = subprocess.run(['docker-compose', 'ps', '--format', 'json'],
                                   cwd=PROJECT_DIR, capture_output=True, text=True)
         if result.returncode == 0:
             services = []
             for line in result.stdout.strip().split('\n'):
                 if line:
                     services.append(json.loads(line))
-            
+
             running_services = [s for s in services if s.get('State') == 'running']
             log_health('INFO', f"Docker services: {len(running_services)}/{len(services)} running")
             return len(running_services) == len(services)
@@ -623,17 +623,17 @@ def check_disk_space():
 
 def main():
     log_health('INFO', 'Starting health check')
-    
+
     checks = [
         ('Docker Services', check_docker_services),
         ('Disk Space', check_disk_space),
     ]
-    
+
     failed_checks = []
     for name, check_func in checks:
         if not check_func():
             failed_checks.append(name)
-    
+
     if failed_checks:
         log_health('WARN', f'Failed checks: {", ".join(failed_checks)}')
         sys.exit(1)
@@ -644,7 +644,7 @@ def main():
 if __name__ == '__main__':
     main()
 EOF
-    
+
     chmod +x "$script_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
     log_success "$context" "Health check script generated"
@@ -654,11 +654,11 @@ EOF
 generate_monitor_script() {
     local context="$MODULE_CONTEXT"
     local script_path="$PROJECT_DIR/scripts/monitor.sh"
-    
+
     log_info "$context" "Generating monitor script"
-    
+
     mkdir -p "$(dirname "$script_path")"
-    
+
     cat > "$script_path" << EOF
 #!/bin/bash
 # Ruuvi Home System Monitor Script
@@ -693,7 +693,7 @@ fi
 
 log_monitor "System monitoring completed"
 EOF
-    
+
     chmod +x "$script_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
     log_success "$context" "Monitor script generated"
@@ -703,11 +703,11 @@ EOF
 generate_maintenance_script() {
     local context="$MODULE_CONTEXT"
     local script_path="$PROJECT_DIR/scripts/maintenance.sh"
-    
+
     log_info "$context" "Generating maintenance script"
-    
+
     mkdir -p "$(dirname "$script_path")"
-    
+
     cat > "$script_path" << EOF
 #!/bin/bash
 # Ruuvi Home Maintenance Script
@@ -721,25 +721,25 @@ log_maintenance() {
 
 cleanup() {
     log_maintenance "Starting cleanup tasks"
-    
+
     # Clean Docker images and containers
     if command -v docker >/dev/null 2>&1; then
         log_maintenance "Cleaning unused Docker resources"
         docker system prune -f >/dev/null 2>&1 || true
     fi
-    
+
     # Clean old log files (keep last 30 days)
     find "${LOG_DIR}" -name "*.log" -mtime +30 -delete 2>/dev/null || true
-    
+
     log_maintenance "Cleanup completed"
 }
 
 update() {
     log_maintenance "Checking for system updates"
-    
+
     # Update package lists
     apt-get update -qq >/dev/null 2>&1 || true
-    
+
     # List available updates
     updates=\$(apt list --upgradable 2>/dev/null | wc -l)
     if [ "\$updates" -gt 1 ]; then
@@ -762,7 +762,7 @@ case "\$1" in
         ;;
 esac
 EOF
-    
+
     chmod +x "$script_path"
     chown "$RUUVI_USER:$RUUVI_USER" "$script_path"
     log_success "$context" "Maintenance script generated"
@@ -771,24 +771,24 @@ EOF
 # Check for existing Mosquitto configuration
 check_existing_mosquitto_config() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Checking for existing Mosquitto configuration"
-    
+
     # Common locations for Mosquitto config
     local mosquitto_configs=(
         "/etc/mosquitto/mosquitto.conf"
         "/etc/mosquitto/conf.d"
         "/var/lib/mosquitto"
     )
-    
+
     local found_configs=()
-    
+
     for config_path in "${mosquitto_configs[@]}"; do
         if [ -e "$config_path" ]; then
             found_configs+=("$config_path")
         fi
     done
-    
+
     if [ ${#found_configs[@]} -gt 0 ]; then
         log_info "$context" "Found existing Mosquitto configuration:"
         for config in "${found_configs[@]}"; do
@@ -805,28 +805,28 @@ check_existing_mosquitto_config() {
 migrate_mosquitto_config() {
     local context="$MODULE_CONTEXT"
     local backup_existing="${1:-true}"
-    
+
     log_info "$context" "Migrating existing Mosquitto configuration"
-    
+
     # Create backup directory
     local backup_dir="$PROJECT_DIR/config/mosquitto-backup"
     mkdir -p "$backup_dir"
     chown "$RUUVI_USER:$RUUVI_USER" "$backup_dir"
-    
+
     # Backup existing configuration
     if [ "$backup_existing" = "true" ]; then
         log_info "$context" "Backing up existing Mosquitto configuration"
-        
+
         if [ -f "/etc/mosquitto/mosquitto.conf" ]; then
             cp "/etc/mosquitto/mosquitto.conf" "$backup_dir/mosquitto.conf.backup"
             log_info "$context" "Backed up main config to $backup_dir/mosquitto.conf.backup"
         fi
-        
+
         if [ -d "/etc/mosquitto/conf.d" ]; then
             cp -r "/etc/mosquitto/conf.d" "$backup_dir/"
             log_info "$context" "Backed up config directory to $backup_dir/conf.d/"
         fi
-        
+
         if [ -d "/var/lib/mosquitto" ]; then
             # Only backup small config files, not large data files
             find "/var/lib/mosquitto" -name "*.conf" -o -name "*.acl" -o -name "*.passwd" | while read -r file; do
@@ -835,11 +835,11 @@ migrate_mosquitto_config() {
             log_info "$context" "Backed up Mosquitto data configs to $backup_dir/"
         fi
     fi
-    
+
     # Create enhanced Mosquitto configuration
     local mosquitto_conf="$PROJECT_DIR/config/mosquitto/mosquitto.conf"
     mkdir -p "$(dirname "$mosquitto_conf")"
-    
+
     cat > "$mosquitto_conf" << 'EOF'
 # Mosquitto MQTT Broker configuration for Ruuvi Home
 # Enhanced configuration with migration from existing setup
@@ -889,7 +889,7 @@ message_size_limit 268435456
 # Keep alive settings
 keepalive_interval 60
 EOF
-    
+
     # If password file exists, create a template
     if [ -f "/etc/mosquitto/passwd" ] || [ -f "$backup_dir/passwd" ]; then
         log_info "$context" "Creating password file template"
@@ -898,7 +898,7 @@ EOF
 # Generate passwords with: mosquitto_passwd -c passwd username
 # Add users with: mosquitto_passwd passwd username
 EOF
-        
+
         # Copy existing passwords if available
         if [ -f "/etc/mosquitto/passwd" ]; then
             cat "/etc/mosquitto/passwd" >> "$PROJECT_DIR/config/mosquitto/passwd"
@@ -907,12 +907,12 @@ EOF
             cat "$backup_dir/passwd" >> "$PROJECT_DIR/config/mosquitto/passwd"
             log_info "$context" "Restored password file from backup"
         fi
-        
+
         # Update main config to use password file
         sed -i 's/allow_anonymous true/allow_anonymous false/' "$mosquitto_conf"
         sed -i 's/# password_file/password_file/' "$mosquitto_conf"
     fi
-    
+
     # If ACL file exists, create a template
     if [ -f "/etc/mosquitto/acl" ] || [ -f "$backup_dir/acl" ]; then
         log_info "$context" "Creating ACL file template"
@@ -929,7 +929,7 @@ topic readwrite homeassistant/#
 user admin
 topic readwrite #
 EOF
-        
+
         # Copy existing ACL if available
         if [ -f "/etc/mosquitto/acl" ]; then
             echo "# --- Migrated from existing configuration ---" >> "$PROJECT_DIR/config/mosquitto/acl"
@@ -940,28 +940,28 @@ EOF
             cat "$backup_dir/acl" >> "$PROJECT_DIR/config/mosquitto/acl"
             log_info "$context" "Restored ACL file from backup"
         fi
-        
+
         # Update main config to use ACL file
         sed -i 's/# acl_file/acl_file/' "$mosquitto_conf"
     fi
-    
+
     # Set proper ownership
     chown -R "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/config/mosquitto"
     chmod 644 "$mosquitto_conf"
     [ -f "$PROJECT_DIR/config/mosquitto/passwd" ] && chmod 600 "$PROJECT_DIR/config/mosquitto/passwd"
     [ -f "$PROJECT_DIR/config/mosquitto/acl" ] && chmod 644 "$PROJECT_DIR/config/mosquitto/acl"
-    
+
     log_success "$context" "Mosquitto configuration migrated successfully"
     log_info "$context" "Original configuration backed up to: $backup_dir"
     log_info "$context" "New configuration: $mosquitto_conf"
-    
+
     return 0
 }
 
 # Handle Mosquitto configuration migration
 handle_mosquitto_migration() {
     local context="$MODULE_CONTEXT"
-    
+
     if check_existing_mosquitto_config; then
         echo ""
         echo "=========================================="
@@ -980,7 +980,7 @@ handle_mosquitto_migration() {
         echo "     - Start fresh with standard settings"
         echo "     - You can manually configure later if needed"
         echo ""
-        
+
         while true; do
             read -p "Would you like to migrate your existing Mosquitto configuration? (y/N): " response
             case "$response" in
@@ -1014,24 +1014,24 @@ handle_mosquitto_migration() {
     else
         log_info "$context" "No existing Mosquitto configuration found, using defaults"
     fi
-    
+
     return 0
 }
 
 # Setup docker-compose file based on deployment mode
 setup_docker_compose_file() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Setting up docker-compose file for deployment mode: ${DEPLOYMENT_MODE:-local}"
-    
+
     case "${DEPLOYMENT_MODE:-local}" in
         "registry")
             local compose_file="$PROJECT_DIR/docker-compose.registry.yaml"
-            
+
             # Check if registry compose file exists in the repo
             if [ ! -f "$compose_file" ]; then
                 log_info "$context" "Creating docker-compose.registry.yaml file"
-                
+
                 cat > "$compose_file" << 'EOF'
 services:
   # MQTT Broker
@@ -1159,7 +1159,7 @@ volumes:
   mosquitto-data:
   mosquitto-log:
 EOF
-                
+
                 chown "$RUUVI_USER:$RUUVI_USER" "$compose_file"
                 log_success "$context" "Created docker-compose.registry.yaml"
             else
@@ -1168,7 +1168,7 @@ EOF
             ;;
         "local")
             log_info "$context" "Using existing docker-compose.yaml for local build mode"
-            
+
             # Verify the local compose file exists
             if [ ! -f "$PROJECT_DIR/docker-compose.yaml" ]; then
                 log_error "$context" "docker-compose.yaml not found for local build mode"
@@ -1180,7 +1180,7 @@ EOF
             return 1
             ;;
     esac
-    
+
     log_success "$context" "Docker compose file setup completed"
     return 0
 }
@@ -1198,27 +1198,27 @@ generate_all_required_files() {
         "generate_monitor_script:Monitor script"
         "generate_maintenance_script:Maintenance script"
     )
-    
+
     log_info "$context" "Generating all required files"
-    
+
     local failed_generators=()
-    
+
     for generator_entry in "${generators[@]}"; do
         local func_name="${generator_entry%:*}"
         local desc="${generator_entry#*:}"
-        
+
         log_info "$context" "Generating: $desc"
-        
+
         if ! $func_name; then
             failed_generators+=("$desc")
         fi
     done
-    
+
     if [ ${#failed_generators[@]} -gt 0 ]; then
         log_error "$context" "Failed to generate: ${failed_generators[*]}"
         return 1
     fi
-    
+
     log_success "$context" "All files generated successfully"
     return 0
 }
@@ -1226,33 +1226,33 @@ generate_all_required_files() {
 # Set proper permissions on generated files
 set_file_permissions() {
     local context="$MODULE_CONTEXT"
-    
+
     log_info "$context" "Setting file permissions"
-    
+
     # Set permissions on scripts
     if [ -d "$PROJECT_DIR/scripts" ]; then
         find "$PROJECT_DIR/scripts" -name "*.py" -exec chmod 755 {} \;
         find "$PROJECT_DIR/scripts" -name "*.sh" -exec chmod 755 {} \;
         chown -R "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/scripts"
     fi
-    
+
     # Set permissions on configuration files
     if [ -f "$PROJECT_DIR/.env" ]; then
         chmod 600 "$PROJECT_DIR/.env"
         chown "$RUUVI_USER:$RUUVI_USER" "$PROJECT_DIR/.env"
     fi
-    
+
     # Set permissions on systemd services
     if [ -f "/etc/systemd/system/ruuvi-home.service" ]; then
         chmod 644 "/etc/systemd/system/ruuvi-home.service"
         chown root:root "/etc/systemd/system/ruuvi-home.service"
     fi
-    
+
     if [ -f "/etc/systemd/system/ruuvi-webhook.service" ]; then
         chmod 644 "/etc/systemd/system/ruuvi-webhook.service"
         chown root:root "/etc/systemd/system/ruuvi-webhook.service"
     fi
-    
+
     log_success "$context" "File permissions set"
     return 0
 }
@@ -1271,15 +1271,15 @@ validate_generated_files() {
         "$PROJECT_DIR/scripts/monitor.sh"
         "$PROJECT_DIR/scripts/maintenance.sh"
     )
-    
+
     log_info "$context" "Validating generated files"
-    
+
     for file in "${required_files[@]}"; do
         if [ ! -f "$file" ]; then
             log_error "$context" "Required file not generated: $file"
             return 1
         fi
-        
+
         # Basic syntax check for Python files
         if [[ "$file" == *.py ]]; then
             if ! python3 -m py_compile "$file"; then
@@ -1287,7 +1287,7 @@ validate_generated_files() {
                 return 1
             fi
         fi
-        
+
         # Basic syntax check for shell files
         if [[ "$file" == *.sh ]]; then
             if ! bash -n "$file"; then
@@ -1296,7 +1296,7 @@ validate_generated_files() {
             fi
         fi
     done
-    
+
     log_success "$context" "All generated files validated"
     return 0
 }
@@ -1311,32 +1311,32 @@ setup_file_generation() {
         "set_file_permissions:Set file permissions"
         "validate_generated_files:Validate generated files"
     )
-    
+
     log_section "File Generation"
     log_info "$context" "Generating files for user: $RUUVI_USER"
-    
+
     local step_num=1
     local total_steps=${#setup_steps[@]}
     local failed_steps=()
-    
+
     for step in "${setup_steps[@]}"; do
         local func_name="${step%:*}"
         local step_desc="${step#*:}"
-        
+
         log_step "$step_num" "$total_steps" "$step_desc"
-        
+
         if ! $func_name; then
             failed_steps+=("$step_desc")
         fi
-        
+
         ((step_num++))
     done
-    
+
     if [ ${#failed_steps[@]} -gt 0 ]; then
         log_error "$context" "File generation failed at: ${failed_steps[*]}"
         return 1
     fi
-    
+
     log_success "$context" "File generation completed successfully"
     return 0
 }

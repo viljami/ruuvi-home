@@ -5,7 +5,7 @@ describe('Data Helpers', () => {
     it('should format timestamp to readable date', () => {
       const timestamp = 1640995200; // 2022-01-01 00:00:00 UTC
       const result = dataHelpers.formatTimestamp(timestamp);
-      
+
       expect(result).toContain('2022');
       expect(typeof result).toBe('string');
     });
@@ -15,28 +15,28 @@ describe('Data Helpers', () => {
     it('should return "Just now" for very recent timestamps', () => {
       const recentTimestamp = Math.floor(Date.now() / 1000) - 30; // 30 seconds ago
       const result = dataHelpers.formatRelativeTime(recentTimestamp);
-      
+
       expect(result).toBe('Just now');
     });
 
     it('should return minutes for recent timestamps', () => {
       const timestamp = Math.floor(Date.now() / 1000) - 300; // 5 minutes ago
       const result = dataHelpers.formatRelativeTime(timestamp);
-      
+
       expect(result).toBe('5m ago');
     });
 
     it('should return hours for older timestamps', () => {
       const timestamp = Math.floor(Date.now() / 1000) - 7200; // 2 hours ago
       const result = dataHelpers.formatRelativeTime(timestamp);
-      
+
       expect(result).toBe('2h ago');
     });
 
     it('should return days for very old timestamps', () => {
       const timestamp = Math.floor(Date.now() / 1000) - 172800; // 2 days ago
       const result = dataHelpers.formatRelativeTime(timestamp);
-      
+
       expect(result).toBe('2d ago');
     });
   });
@@ -44,13 +44,13 @@ describe('Data Helpers', () => {
   describe('isSensorOnline', () => {
     it('should return true for recent timestamp', () => {
       const recentTimestamp = Math.floor(Date.now() / 1000) - 300; // 5 minutes ago
-      
+
       expect(dataHelpers.isSensorOnline(recentTimestamp)).toBe(true);
     });
 
     it('should return false for old timestamp', () => {
       const oldTimestamp = Math.floor(Date.now() / 1000) - 3600; // 1 hour ago
-      
+
       expect(dataHelpers.isSensorOnline(oldTimestamp)).toBe(false);
     });
   });
@@ -126,21 +126,21 @@ describe('Data Helpers', () => {
     it('should return online for very recent data', () => {
       const now = Date.now();
       const recentTimestamp = Math.floor((now - 2 * 60 * 1000) / 1000); // 2 minutes ago
-      
+
       expect(dataHelpers.getSensorStatus(recentTimestamp)).toBe('online');
     });
 
     it('should return warning for moderately old data', () => {
       const now = Date.now();
       const warningTimestamp = Math.floor((now - 15 * 60 * 1000) / 1000); // 15 minutes ago
-      
+
       expect(dataHelpers.getSensorStatus(warningTimestamp)).toBe('warning');
     });
 
     it('should return offline for very old data', () => {
       const now = Date.now();
       const offlineTimestamp = Math.floor((now - 45 * 60 * 1000) / 1000); // 45 minutes ago
-      
+
       expect(dataHelpers.getSensorStatus(offlineTimestamp)).toBe('offline');
     });
   });

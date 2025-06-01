@@ -43,15 +43,15 @@ global.IntersectionObserver = class IntersectionObserver {
   root: Element | Document | null = null;
   rootMargin: string = '';
   thresholds: ReadonlyArray<number> = [];
-  
+
   constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
     this.root = options?.root || null;
     this.rootMargin = options?.rootMargin || '';
-    this.thresholds = options?.threshold ? 
-      (Array.isArray(options.threshold) ? options.threshold : [options.threshold]) : 
+    this.thresholds = options?.threshold ?
+      (Array.isArray(options.threshold) ? options.threshold : [options.threshold]) :
       [];
   }
-  
+
   disconnect() {}
   observe() {}
   unobserve() {}
@@ -97,7 +97,7 @@ beforeAll(() => {
     }
     originalError.call(console, ...args);
   };
-  
+
   console.warn = (...args: any[]) => {
     if (
       typeof args[0] === 'string' &&

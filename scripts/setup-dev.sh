@@ -12,44 +12,47 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to install pre-commit
-install_precommit() {
-    echo "📦 Installing pre-commit..."
-    if command_exists pip3; then
-        pip3 install pre-commit
-    elif command_exists pip; then
-        pip install pre-commit
+# Function to setup virtual environment and install pre-commit
+setup_python_env() {
+    echo "🐍 Setting up Python virtual environment..."
+
+    # Create virtual environment if it doesn't exist
+    if [ ! -d "venv" ]; then
+        python3 -m venv venv
+        echo "✅ Created virtual environment"
     else
-        echo "❌ Error: pip not found. Please install Python and pip first."
-        exit 1
+        echo "✅ Virtual environment already exists"
     fi
+
+    # Activate virtual environment
+    source venv/bin/activate
+
+    # Upgrade pip
+    pip install --upgrade pip
+
+    echo "📦 Installing pre-commit in virtual environment..."
+    pip install pre-commit
 }
 
-# Check and install pre-commit
-if ! command_exists pre-commit; then
-    install_precommit
-else
-    echo "✅ pre-commit is already installed"
-fi
+# Setup Python environment and install pre-commit
+setup_python_env
+
+# Activate virtual environment for the rest of the script
+source venv/bin/activate
 
 # Install pre-commit hooks
 echo "🔧 Installing pre-commit hooks..."
 pre-commit install
 
-# Setup Python environment for MQTT simulator
-echo "🐍 Setting up Python environment for MQTT simulator..."
+# Setup MQTT simulator dependencies in virtual environment
+echo "🐍 Setting up MQTT simulator dependencies..."
 cd docker/mqtt-simulator
 
-# Install Python dependencies
+# Install Python dependencies in virtual environment
 if [ -f "requirements.txt" ]; then
-    echo "📦 Installing Python dependencies..."
-    if command_exists pip3; then
-        pip3 install -r requirements.txt
-        pip3 install pytest pytest-cov black isort flake8
-    elif command_exists pip; then
-        pip install -r requirements.txt
-        pip install pytest pytest-cov black isort flake8
-    fi
+    echo "📦 Installing Python dependencies in virtual environment..."
+    pip install -r requirements.txt
+    pip install pytest pytest-cov black isort flake8
 else
     echo "⚠️  Warning: requirements.txt not found in mqtt-simulator directory"
 fi
@@ -84,13 +87,11 @@ fi
 # Run initial formatting
 echo "🎨 Running initial code formatting..."
 
-# Format Python code
+# Format Python code using virtual environment
 if [ -d "docker/mqtt-simulator" ]; then
     cd docker/mqtt-simulator
-    if command_exists python3; then
-        echo "🐍 Formatting Python code..."
-        make fmt || true
-    fi
+    echo "🐍 Formatting Python code..."
+    make fmt || true
     cd ../..
 fi
 
@@ -106,12 +107,15 @@ echo ""
 echo "✅ Development environment setup complete!"
 echo ""
 echo "🎯 Next steps:"
+echo "   • Activate virtual environment: source venv/bin/activate"
 echo "   • Run 'make dev' in backend/ to check Rust code quality"
 echo "   • Run 'make dev' in docker/mqtt-simulator/ to check Python code quality"
 echo "   • Pre-commit hooks will now run automatically on git commit"
 echo "   • Use 'pre-commit run --all-files' to run hooks on all files"
 echo ""
 echo "📚 Useful commands:"
+echo "   • 'source venv/bin/activate' - Activate Python virtual environment"
+echo "   • 'deactivate' - Deactivate virtual environment"
 echo "   • 'make help' in backend/ - See all available Rust targets"
 echo "   • 'make help' in docker/mqtt-simulator/ - See all available Python targets"
 echo "   • 'pre-commit run --all-files' - Run all pre-commit hooks"

@@ -176,7 +176,7 @@ export const dataHelpers = {
   getSensorStatus(timestamp: number): 'online' | 'offline' | 'warning' {
     const now = Date.now();
     const diff = now - timestamp * 1000;
-    
+
     if (diff < 5 * 60 * 1000) return 'online'; // Less than 5 minutes
     if (diff < 30 * 60 * 1000) return 'warning'; // Less than 30 minutes
     return 'offline';

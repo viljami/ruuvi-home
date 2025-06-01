@@ -64,27 +64,27 @@ trap cleanup EXIT
 # Validate environment
 validate_environment() {
     log_info "Validating deployment environment"
-    
+
     if [ ! -d "$PROJECT_DIR" ]; then
         log_error "Project directory not found: $PROJECT_DIR"
         return 1
     fi
-    
+
     if [ ! -f "$PROJECT_DIR/docker-compose.yml" ]; then
         log_error "Docker Compose file not found"
         return 1
     fi
-    
+
     if ! command -v docker &> /dev/null; then
         log_error "Docker not found"
         return 1
     fi
-    
+
     if ! command -v git &> /dev/null; then
         log_error "Git not found"
         return 1
     fi
-    
+
     log_success "Environment validation passed"
     return 0
 }
@@ -92,13 +92,13 @@ validate_environment() {
 # Create pre-deployment backup
 create_backup() {
     log_info "Creating pre-deployment backup"
-    
+
     local backup_timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_file="$BACKUP_DIR/pre_deploy_backup_${backup_timestamp}.sql.gz"
-    
+
     # Ensure backup directory exists
     mkdir -p "$BACKUP_DIR"
-    
+
     # Create database backup
     if docker-compose exec -T timescaledb pg_dump -U {{ database.user }} {{ database.name }} | gzip > "$backup_file"; then
         log_success "Backup created: $(basename "$backup_file")"
@@ -113,30 +113,30 @@ create_backup() {
 # Update repository
 update_repository() {
     log_info "Updating repository to latest version"
-    
+
     # Fetch latest changes
     if ! git fetch origin; then
         log_error "Failed to fetch repository updates"
         return 1
     fi
-    
+
     # Get current and target commits
     local current_commit=$(git rev-parse HEAD)
     local target_commit=$(git rev-parse origin/{{ project.branch }})
-    
+
     if [ "$current_commit" = "$target_commit" ]; then
         log_info "Repository already up to date"
         return 0
     fi
-    
+
     log_info "Updating from $current_commit to $target_commit"
-    
+
     # Reset to latest main branch
     if ! git reset --hard "origin/{{ project.branch }}"; then
         log_error "Failed to reset to latest branch"
         return 1
     fi
-    
+
     log_success "Repository updated successfully"
     return 0
 }
@@ -144,12 +144,12 @@ update_repository() {
 # Pull latest Docker images
 pull_docker_images() {
     log_info "Pulling latest Docker images"
-    
+
     if ! timeout $MAX_DEPLOY_TIME docker-compose pull; then
         log_error "Failed to pull Docker images"
         return 1
     fi
-    
+
     log_success "Docker images updated"
     return 0
 }
@@ -157,14 +157,14 @@ pull_docker_images() {
 # Stop services gracefully
 stop_services() {
     log_info "Stopping services gracefully"
-    
+
     # Stop containers with timeout
     if ! timeout 60 docker-compose down; then
         log_warn "Graceful shutdown timed out, forcing stop"
         docker-compose kill
         docker-compose rm -f
     fi
-    
+
     log_success "Services stopped"
     return 0
 }
@@ -172,12 +172,12 @@ stop_services() {
 # Start services
 start_services() {
     log_info "Starting services with updated images"
-    
+
     if ! timeout $MAX_DEPLOY_TIME docker-compose up -d --force-recreate --remove-orphans; then
         log_error "Failed to start services"
         return 1
     fi
-    
+
     log_success "Services started"
     return 0
 }
@@ -185,44 +185,44 @@ start_services() {
 # Wait for services to be healthy
 wait_for_health() {
     log_info "Waiting for services to be healthy"
-    
+
     local attempt=1
     while [ $attempt -le $HEALTH_CHECK_RETRIES ]; do
         log_info "Health check attempt $attempt/$HEALTH_CHECK_RETRIES"
-        
+
         local healthy=true
-        
+
         # Check database health
         if ! docker-compose exec -T timescaledb pg_isready -U {{ database.user }} -d {{ database.name }} &>/dev/null; then
             log_warn "Database not ready"
             healthy=false
         fi
-        
+
         # Check API health
         if ! curl -sf http://localhost:{{ ports.api }}/health &>/dev/null; then
             log_warn "API not ready"
             healthy=false
         fi
-        
+
         # Check frontend health
         if ! curl -sf http://localhost:{{ ports.frontend }}/health &>/dev/null; then
             log_warn "Frontend not ready"
             healthy=false
         fi
-        
+
         if [ "$healthy" = true ]; then
             log_success "All services are healthy"
             return 0
         fi
-        
+
         if [ $attempt -lt $HEALTH_CHECK_RETRIES ]; then
             log_info "Waiting ${HEALTH_CHECK_INTERVAL}s before next check"
             sleep $HEALTH_CHECK_INTERVAL
         fi
-        
+
         ((attempt++))
     done
-    
+
     log_error "Health check failed after $HEALTH_CHECK_RETRIES attempts"
     return 1
 }
@@ -230,14 +230,14 @@ wait_for_health() {
 # Run post-deployment validation
 validate_deployment() {
     log_info "Running post-deployment validation"
-    
+
     # Check container status
     local unhealthy_containers=$(docker-compose ps --format json | jq -r 'select(.State != "running") | .Name' 2>/dev/null || true)
     if [ -n "$unhealthy_containers" ]; then
         log_error "Unhealthy containers found: $unhealthy_containers"
         return 1
     fi
-    
+
     # Run health check script if available
     if [ -f "$PROJECT_DIR/scripts/health-check.py" ]; then
         log_info "Running comprehensive health check"
@@ -246,7 +246,7 @@ validate_deployment() {
             return 1
         fi
     fi
-    
+
     log_success "Deployment validation passed"
     return 0
 }
@@ -254,23 +254,23 @@ validate_deployment() {
 # Cleanup old resources
 cleanup_resources() {
     log_info "Cleaning up old Docker resources"
-    
+
     # Remove unused images
     docker image prune -f &>/dev/null || log_warn "Failed to prune images"
-    
+
     # Remove unused volumes
     docker volume prune -f &>/dev/null || log_warn "Failed to prune volumes"
-    
+
     # Remove unused networks
     docker network prune -f &>/dev/null || log_warn "Failed to prune networks"
-    
+
     log_success "Resource cleanup completed"
 }
 
 # Rollback deployment
 rollback_deployment() {
     log_error "Rolling back deployment"
-    
+
     # Try to restore from backup if available
     local latest_backup=$(ls -t "$BACKUP_DIR"/pre_deploy_backup_*.sql.gz 2>/dev/null | head -1)
     if [ -n "$latest_backup" ]; then
@@ -278,7 +278,7 @@ rollback_deployment() {
         # Note: Full rollback implementation would need database restore logic
         log_warn "Manual intervention may be required for complete rollback"
     fi
-    
+
     # Try to restart with previous images
     log_info "Attempting to restart services"
     docker-compose up -d || log_error "Failed to restart services"
@@ -289,18 +289,18 @@ main() {
     log_info "Starting deployment for tag: $TAG"
     log_info "Deployment initiated by: ${USER:-unknown}"
     log_info "Project directory: $PROJECT_DIR"
-    
+
     # Change to project directory
     cd "$PROJECT_DIR"
-    
+
     # Deployment steps
     local backup_file=""
-    
+
     # Validation
     if ! validate_environment; then
         exit 1
     fi
-    
+
     # Create backup
     if backup_file=$(create_backup); then
         log_info "Backup location: $backup_file"
@@ -308,57 +308,57 @@ main() {
         log_error "Backup failed, aborting deployment"
         exit 1
     fi
-    
+
     # Update repository
     if ! update_repository; then
         log_error "Repository update failed, aborting deployment"
         exit 1
     fi
-    
+
     # Pull new images
     if ! pull_docker_images; then
         log_error "Image pull failed, aborting deployment"
         exit 1
     fi
-    
+
     # Stop services
     if ! stop_services; then
         log_error "Failed to stop services"
         rollback_deployment
         exit 1
     fi
-    
+
     # Start services
     if ! start_services; then
         log_error "Failed to start services"
         rollback_deployment
         exit 1
     fi
-    
+
     # Wait for health
     if ! wait_for_health; then
         log_error "Services failed health check"
         rollback_deployment
         exit 1
     fi
-    
+
     # Validate deployment
     if ! validate_deployment; then
         log_error "Deployment validation failed"
         rollback_deployment
         exit 1
     fi
-    
+
     # Cleanup
     cleanup_resources
-    
+
     # Success
     local deployment_time=$(($(date +%s) - ${DEPLOY_START_TIME:-$(date +%s)}))
     log_success "Deployment completed successfully in ${deployment_time}s"
     log_success "Tag: $TAG"
     log_success "Backup: $(basename "$backup_file")"
     log_info "Application available at: http://{{ ansible_default_ipv4.address | default('localhost') }}:{{ ports.frontend }}"
-    
+
     # Send deployment notification if webhook is configured
     if [ -n "${WEBHOOK_NOTIFICATION_URL:-}" ]; then
         curl -X POST "$WEBHOOK_NOTIFICATION_URL" \

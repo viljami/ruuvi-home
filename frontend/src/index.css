@@ -261,7 +261,7 @@ code {
   .sensor-card:hover {
     transform: none;
   }
-  
+
   .error-slide-in {
     animation: none;
   }
@@ -469,17 +469,17 @@ code {
   .ambient-glow-animation {
     animation: none;
   }
-  
+
   .sensor-card,
   .ambient-hover {
     transition: none;
   }
-  
+
   .sensor-card:hover,
   .ambient-hover:hover {
     transform: none;
   }
-  
+
   .ambient-glow::before {
     display: none;
   }

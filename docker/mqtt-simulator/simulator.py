@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 import json
-import time
-import random
-import os
 import logging
+import os
+import random
+import struct
+import time
 
 import paho.mqtt.client as mqtt
-import struct
 
 # Configure logging
 logging.basicConfig(

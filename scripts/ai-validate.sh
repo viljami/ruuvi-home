@@ -43,10 +43,10 @@ validate_command() {
     local description="$1"
     local command="$2"
     local directory="${3:-$PWD}"
-    
+
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "$description"
-    
+
     if cd "$directory" && eval "$command" >/dev/null 2>&1; then
         log_success "$description passed"
         cd "$PROJECT_ROOT"
@@ -141,16 +141,16 @@ validate_rust() {
         echo -e "${YELLOW}⚠️  No Rust project found, skipping Rust validation${NC}"
         return 0
     fi
-    
+
     local rust_files
     rust_files=$(find_rust_files | head -1)
     if [ -z "$rust_files" ]; then
         echo -e "${YELLOW}⚠️  No Rust source files found, skipping Rust validation${NC}"
         return 0
     fi
-    
+
     echo -e "\n${YELLOW}=== Rust Validation ===${NC}"
-    
+
     validate_command "Rust build check" "make build" "$PROJECT_ROOT/backend"
     validate_command "Rust code quality (MANDATORY - single source of truth)" "make lint" "$PROJECT_ROOT/backend"
     validate_command "Rust tests" "make test" "$PROJECT_ROOT/backend"
@@ -162,16 +162,16 @@ validate_typescript() {
         echo -e "${YELLOW}⚠️  No TypeScript project found, skipping TypeScript validation${NC}"
         return 0
     fi
-    
+
     local ts_files
     ts_files=$(find_typescript_files | head -1)
     if [ -z "$ts_files" ]; then
         echo -e "${YELLOW}⚠️  No TypeScript source files found, skipping TypeScript validation${NC}"
         return 0
     fi
-    
+
     echo -e "\n${YELLOW}=== TypeScript/React Validation ===${NC}"
-    
+
     validate_command "TypeScript compilation" "npx tsc --noEmit" "$PROJECT_ROOT/frontend"
     validate_command "ESLint validation" "npx eslint src --ext .js,.jsx,.ts,.tsx --max-warnings 0" "$PROJECT_ROOT/frontend"
     validate_command "Prettier formatting" "npx prettier --check 'src/**/*.{js,jsx,ts,tsx,json,css,scss,md}'" "$PROJECT_ROOT/frontend"
@@ -182,14 +182,14 @@ validate_typescript() {
 validate_python() {
     local python_files
     python_files=$(find_python_files | head -1)
-    
+
     if [ -z "$python_files" ]; then
         echo -e "${YELLOW}⚠️  No Python source files found, skipping Python validation${NC}"
         return 0
     fi
-    
+
     echo -e "\n${YELLOW}=== Python Validation ===${NC}"
-    
+
     # Syntax validation
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "Python syntax validation"
@@ -200,13 +200,13 @@ validate_python() {
             python_syntax_failed=1
         fi
     done < <(find_python_files -print0)
-    
+
     if [ $python_syntax_failed -eq 0 ]; then
         log_success "Python syntax validation passed"
     else
         log_failure "Python syntax validation failed"
     fi
-    
+
     # Check if Python tools are available and validate
     if command -v flake8 >/dev/null 2>&1; then
         # Create temporary flake8 config to exclude build directories
@@ -215,7 +215,7 @@ validate_python() {
 [flake8]
 max-line-length = 88
 extend-ignore = E203,W503
-exclude = 
+exclude =
     __pycache__,
     venv,
     .venv,
@@ -234,7 +234,7 @@ EOF
     else
         echo -e "${YELLOW}⚠️  flake8 not available, skipping Python linting${NC}"
     fi
-    
+
     if command -v black >/dev/null 2>&1; then
         # Validate only Python source files
         TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -246,7 +246,7 @@ EOF
                 black_failed=1
             fi
         done < <(find_python_files -print0)
-        
+
         if [ $black_failed -eq 0 ]; then
             log_success "Python formatting (black) passed"
         else
@@ -255,7 +255,7 @@ EOF
     else
         echo -e "${YELLOW}⚠️  black not available, skipping Python formatting check${NC}"
     fi
-    
+
     if command -v isort >/dev/null 2>&1; then
         # Validate import sorting only on source files
         TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -267,7 +267,7 @@ EOF
                 isort_failed=1
             fi
         done < <(find_python_files -print0)
-        
+
         if [ $isort_failed -eq 0 ]; then
             log_success "Python import sorting passed"
         else
@@ -276,7 +276,7 @@ EOF
     else
         echo -e "${YELLOW}⚠️  isort not available, skipping import sorting check${NC}"
     fi
-    
+
     # Run pytest if available
     if command -v pytest >/dev/null 2>&1; then
         validate_command "Python tests" "pytest -v --tb=short" "$PROJECT_ROOT"
@@ -289,14 +289,14 @@ EOF
 validate_shell() {
     local shell_files
     shell_files=$(find_shell_files | head -1)
-    
+
     if [ -z "$shell_files" ]; then
         echo -e "${YELLOW}⚠️  No Shell source files found, skipping Shell validation${NC}"
         return 0
     fi
-    
+
     echo -e "\n${YELLOW}=== Shell Script Validation ===${NC}"
-    
+
     # Syntax validation
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "Shell syntax validation"
@@ -307,13 +307,13 @@ validate_shell() {
             shell_syntax_failed=1
         fi
     done < <(find_shell_files -print0)
-    
+
     if [ $shell_syntax_failed -eq 0 ]; then
         log_success "Shell syntax validation passed"
     else
         log_failure "Shell syntax validation failed"
     fi
-    
+
     # ShellCheck validation if available
     if command -v shellcheck >/dev/null 2>&1; then
         TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
@@ -325,7 +325,7 @@ validate_shell() {
                 shellcheck_failed=1
             fi
         done < <(find_shell_files -print0)
-        
+
         if [ $shellcheck_failed -eq 0 ]; then
             log_success "ShellCheck linting passed"
         else
@@ -340,14 +340,14 @@ validate_shell() {
 validate_yaml() {
     local yaml_files
     yaml_files=$(find_yaml_files | head -1)
-    
+
     if [ -z "$yaml_files" ]; then
         echo -e "${YELLOW}⚠️  No YAML source files found, skipping YAML validation${NC}"
         return 0
     fi
-    
+
     echo -e "\n${YELLOW}=== YAML Validation ===${NC}"
-    
+
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "YAML syntax validation"
     local yaml_failed=0
@@ -357,13 +357,13 @@ validate_yaml() {
             yaml_failed=1
         fi
     done < <(find_yaml_files -print0)
-    
+
     if [ $yaml_failed -eq 0 ]; then
         log_success "YAML syntax validation passed"
     else
         log_failure "YAML syntax validation failed"
     fi
-    
+
     # Docker Compose validation
     if [ -f "$PROJECT_ROOT/docker-compose.yaml" ]; then
         validate_command "Docker Compose validation" "docker-compose -f docker-compose.yaml config" "$PROJECT_ROOT"
@@ -374,14 +374,14 @@ validate_yaml() {
 validate_json() {
     local json_files
     json_files=$(find_json_files | head -1)
-    
+
     if [ -z "$json_files" ]; then
         echo -e "${YELLOW}⚠️  No JSON source files found, skipping JSON validation${NC}"
         return 0
     fi
-    
+
     echo -e "\n${YELLOW}=== JSON Validation ===${NC}"
-    
+
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "JSON syntax validation"
     local json_failed=0
@@ -391,7 +391,7 @@ validate_json() {
             json_failed=1
         fi
     done < <(find_json_files -print0)
-    
+
     if [ $json_failed -eq 0 ]; then
         log_success "JSON syntax validation passed"
     else
@@ -402,7 +402,7 @@ validate_json() {
 # Function to check for common AI output issues
 validate_ai_patterns() {
     echo -e "\n${YELLOW}=== AI Pattern Validation ===${NC}"
-    
+
     # Check for orphaned XML/HTML tags in source files only
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "Checking for orphaned XML/HTML tags"
@@ -413,24 +413,24 @@ validate_ai_patterns() {
         local closing_tags
         opening_tags=$(grep -o '<[^/][^>]*>' "$file" 2>/dev/null | wc -l)
         closing_tags=$(grep -o '</[^>]*>' "$file" 2>/dev/null | wc -l)
-        
+
         if [ "$opening_tags" -ne "$closing_tags" ] && [ "$opening_tags" -gt 0 ]; then
             echo -e "${RED}Potential orphaned tags in: $file (opening: $opening_tags, closing: $closing_tags)${NC}"
             orphaned_tags=1
         fi
     done < <(find_typescript_files -name "*.tsx" -print0; find_javascript_files -name "*.jsx" -print0)
-    
+
     if [ $orphaned_tags -eq 0 ]; then
         log_success "No orphaned XML/HTML tags found"
     else
         log_failure "Potential orphaned XML/HTML tags detected"
     fi
-    
+
     # Check for mismatched brackets in source files only
     TOTAL_CHECKS=$((TOTAL_CHECKS + 1))
     log_step "Checking for bracket balance"
     local bracket_issues=0
-    
+
     # Combine all source files for bracket checking
     {
         find_rust_files -print0
@@ -445,14 +445,14 @@ validate_ai_patterns() {
         local close_brackets
         local open_parens
         local close_parens
-        
+
         open_braces=$(grep -o '{' "$file" 2>/dev/null | wc -l)
         close_braces=$(grep -o '}' "$file" 2>/dev/null | wc -l)
         open_brackets=$(grep -o '\[' "$file" 2>/dev/null | wc -l)
         close_brackets=$(grep -o '\]' "$file" 2>/dev/null | wc -l)
         open_parens=$(grep -o '(' "$file" 2>/dev/null | wc -l)
         close_parens=$(grep -o ')' "$file" 2>/dev/null | wc -l)
-        
+
         if [ "$open_braces" -ne "$close_braces" ] || [ "$open_brackets" -ne "$close_brackets" ] || [ "$open_parens" -ne "$close_parens" ]; then
             echo -e "${RED}Bracket mismatch in: $file${NC}"
             echo -e "  Braces: $open_braces open, $close_braces close"
@@ -461,7 +461,7 @@ validate_ai_patterns() {
             bracket_issues=1
         fi
     done
-    
+
     if [ $bracket_issues -eq 0 ]; then
         log_success "No bracket balance issues found"
     else
@@ -477,10 +477,10 @@ main() {
     echo -e "Scope: Application source code only"
     echo -e "Timestamp: $(date)"
     echo -e ""
-    
+
     # Change to project root
     cd "$PROJECT_ROOT"
-    
+
     # Run all validations
     validate_rust
     validate_typescript
@@ -489,7 +489,7 @@ main() {
     validate_yaml
     validate_json
     validate_ai_patterns
-    
+
     # Final summary
     echo -e "\n${BLUE}==============================${NC}"
     echo -e "${BLUE}Validation Summary${NC}"
@@ -498,7 +498,7 @@ main() {
     echo -e "Passed: $PASSED_CHECKS"
     echo -e "Failed: $((TOTAL_CHECKS - PASSED_CHECKS))"
     echo -e ""
-    
+
     if [ $VALIDATION_FAILED -eq 0 ]; then
         echo -e "${GREEN}🎉 ALL VALIDATIONS PASSED!${NC}"
         echo -e "${GREEN}Code is ready for commit and human review.${NC}"

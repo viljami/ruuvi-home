@@ -110,7 +110,7 @@ services:
     requires: ["docker.service"]
     after: ["docker.service", "network.target"]
     restart: "always"
-    
+
   ruuvi_webhook:
     description: "Ruuvi Home Deployment Webhook"
     requires: ["network.target"]

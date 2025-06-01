@@ -46,17 +46,17 @@ check_docker() {
 # Function to check network connectivity
 check_network() {
     print_status "Checking network connectivity..."
-    
+
     if ! ping -c 1 8.8.8.8 >/dev/null 2>&1; then
         print_error "No internet connectivity"
         exit 1
     fi
-    
+
     if ! nslookup deb.debian.org >/dev/null 2>&1; then
         print_warning "DNS resolution issues detected"
         print_status "You may experience package download issues"
     fi
-    
+
     print_success "Network connectivity OK"
 }
 
@@ -73,10 +73,10 @@ build_with_retry() {
     local service="$1"
     local max_attempts=3
     local attempt=1
-    
+
     while [ $attempt -le $max_attempts ]; do
         print_status "Build attempt $attempt/$max_attempts for $service"
-        
+
         if docker buildx build \
             --file "docker/${service}.Dockerfile" \
             --tag "ruuvi-${service}:latest" \
@@ -90,16 +90,16 @@ build_with_retry() {
             if [ $attempt -lt $max_attempts ]; then
                 print_status "Waiting 10 seconds before retry..."
                 sleep 10
-                
+
                 # Clean cache between attempts
                 print_status "Cleaning cache before retry..."
                 docker builder prune -f
             fi
         fi
-        
+
         attempt=$((attempt + 1))
     done
-    
+
     print_error "All build attempts failed for $service"
     return 1
 }
@@ -107,9 +107,9 @@ build_with_retry() {
 # Function to build with offline cache
 build_offline() {
     local service="$1"
-    
+
     print_status "Attempting offline build for $service using cached layers..."
-    
+
     docker buildx build \
         --file "docker/${service}.Dockerfile" \
         --tag "ruuvi-${service}:latest" \
@@ -123,23 +123,23 @@ build_offline() {
 # Function to diagnose build issues
 diagnose_build() {
     print_status "Running build diagnostics..."
-    
+
     echo "Docker version:"
     docker version
     echo ""
-    
+
     echo "Docker info:"
     docker info
     echo ""
-    
+
     echo "Available disk space:"
     df -h
     echo ""
-    
+
     echo "Docker images:"
     docker images
     echo ""
-    
+
     echo "Docker containers:"
     docker ps -a
     echo ""
@@ -161,7 +161,7 @@ show_usage() {
     echo ""
     echo "Services:"
     echo "  mqtt-reader     - MQTT reader service"
-    echo "  api-server      - API server service" 
+    echo "  api-server      - API server service"
     echo "  mqtt-simulator  - MQTT simulator service"
     echo ""
     echo "Examples:"
@@ -174,7 +174,7 @@ show_usage() {
 # Main script logic
 main() {
     cd "$PROJECT_ROOT"
-    
+
     case "${1:-}" in
         "check")
             check_docker
@@ -194,7 +194,7 @@ main() {
                 show_usage
                 exit 1
             fi
-            
+
             check_docker
             check_network
             build_with_retry "$2"
@@ -202,16 +202,16 @@ main() {
         "build-all")
             check_docker
             check_network
-            
+
             services=("mqtt-reader" "api-server" "mqtt-simulator")
             failed_services=()
-            
+
             for service in "${services[@]}"; do
                 if ! build_with_retry "$service"; then
                     failed_services+=("$service")
                 fi
             done
-            
+
             if [ ${#failed_services[@]} -eq 0 ]; then
                 print_success "All services built successfully"
             else
@@ -225,7 +225,7 @@ main() {
                 show_usage
                 exit 1
             fi
-            
+
             check_docker
             build_offline "$2"
             ;;

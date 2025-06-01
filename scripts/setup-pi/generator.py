@@ -33,7 +33,7 @@ class GeneratorConfig:
     mosquitto_port: int
     timezone: str
     python_venv: str
-    
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'GeneratorConfig':
         """Create config from dictionary"""
@@ -41,7 +41,7 @@ class GeneratorConfig:
 
 class FileGenerator:
     """Handles file generation from templates"""
-    
+
     def __init__(self, config: GeneratorConfig, template_dir: Path, output_dir: Path):
         self.config = config
         self.template_dir = template_dir
@@ -51,49 +51,49 @@ class FileGenerator:
             trim_blocks=True,
             lstrip_blocks=True
         )
-        
+
         # Setup logging
         logging.basicConfig(
             level=logging.INFO,
             format='%(asctime)s - %(levelname)s - %(message)s'
         )
         self.logger = logging.getLogger(__name__)
-    
-    def generate_file(self, template_name: str, output_path: Path, 
+
+    def generate_file(self, template_name: str, output_path: Path,
                      extra_vars: Dict[str, Any] = None) -> bool:
         """Generate a single file from template"""
         try:
             template = self.env.get_template(template_name)
-            
+
             # Merge config with extra variables
             template_vars = asdict(self.config)
             if extra_vars:
                 template_vars.update(extra_vars)
-            
+
             # Generate content
             content = template.render(**template_vars)
-            
+
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Write file
             with open(output_path, 'w') as f:
                 f.write(content)
-            
+
             self.logger.info(f"Generated: {output_path}")
             return True
-            
+
         except Exception as e:
             self.logger.error(f"Failed to generate {output_path}: {e}")
             return False
-    
-    def set_file_permissions(self, file_path: Path, mode: int, 
+
+    def set_file_permissions(self, file_path: Path, mode: int,
                            owner: str = None) -> bool:
         """Set file permissions and ownership"""
         try:
             # Set file mode
             file_path.chmod(mode)
-            
+
             # Set ownership if specified
             if owner:
                 import pwd
@@ -101,7 +101,7 @@ class FileGenerator:
                 user_info = pwd.getpwnam(owner)
                 group_info = grp.getgrnam(owner)
                 os.chown(file_path, user_info.pw_uid, group_info.gr_gid)
-            
+
             return True
         except Exception as e:
             self.logger.error(f"Failed to set permissions for {file_path}: {e}")
@@ -109,20 +109,20 @@ class FileGenerator:
 
 class RuuviSetupGenerator:
     """Main generator for Ruuvi Home setup files"""
-    
+
     def __init__(self, config_file: Path):
         self.config_file = config_file
         self.config = self._load_config()
         self.script_dir = Path(__file__).parent
         self.template_dir = self.script_dir / "templates"
         self.output_dir = Path(self.config.project_dir)
-        
+
         self.generator = FileGenerator(
-            self.config, 
-            self.template_dir, 
+            self.config,
+            self.template_dir,
             self.output_dir
         )
-    
+
     def _load_config(self) -> GeneratorConfig:
         """Load configuration from file"""
         try:
@@ -131,12 +131,12 @@ class RuuviSetupGenerator:
                     data = yaml.safe_load(f)
                 else:
                     data = json.load(f)
-            
+
             return GeneratorConfig.from_dict(data)
         except Exception as e:
             logging.error(f"Failed to load config: {e}")
             sys.exit(1)
-    
+
     def generate_python_scripts(self) -> bool:
         """Generate Python scripts"""
         scripts = [
@@ -159,21 +159,21 @@ class RuuviSetupGenerator:
                 'owner': self.config.ruuvi_user
             }
         ]
-        
+
         success = True
         for script in scripts:
             output_path = self.output_dir / script['output']
             if self.generator.generate_file(script['template'], output_path):
                 self.generator.set_file_permissions(
-                    output_path, 
-                    script['mode'], 
+                    output_path,
+                    script['mode'],
                     script['owner']
                 )
             else:
                 success = False
-        
+
         return success
-    
+
     def generate_shell_scripts(self) -> bool:
         """Generate shell scripts"""
         scripts = [
@@ -208,21 +208,21 @@ class RuuviSetupGenerator:
                 'owner': self.config.ruuvi_user
             }
         ]
-        
+
         success = True
         for script in scripts:
             output_path = self.output_dir / script['output']
             if self.generator.generate_file(script['template'], output_path):
                 self.generator.set_file_permissions(
-                    output_path, 
-                    script['mode'], 
+                    output_path,
+                    script['mode'],
                     script['owner']
                 )
             else:
                 success = False
-        
+
         return success
-    
+
     def generate_systemd_services(self) -> bool:
         """Generate systemd service files"""
         services = [
@@ -239,21 +239,21 @@ class RuuviSetupGenerator:
                 'owner': 'root'
             }
         ]
-        
+
         success = True
         for service in services:
             output_path = Path(service['output'])
             if self.generator.generate_file(service['template'], output_path):
                 self.generator.set_file_permissions(
-                    output_path, 
-                    service['mode'], 
+                    output_path,
+                    service['mode'],
                     service['owner']
                 )
             else:
                 success = False
-        
+
         return success
-    
+
     def generate_configuration_files(self) -> bool:
         """Generate configuration files"""
         configs = [
@@ -276,21 +276,21 @@ class RuuviSetupGenerator:
                 'owner': self.config.ruuvi_user
             }
         ]
-        
+
         success = True
         for config in configs:
             output_path = self.output_dir / config['output']
             if self.generator.generate_file(config['template'], output_path):
                 self.generator.set_file_permissions(
-                    output_path, 
-                    config['mode'], 
+                    output_path,
+                    config['mode'],
                     config['owner']
                 )
             else:
                 success = False
-        
+
         return success
-    
+
     def generate_all(self) -> bool:
         """Generate all files"""
         tasks = [
@@ -299,36 +299,36 @@ class RuuviSetupGenerator:
             ("SystemD services", self.generate_systemd_services),
             ("Configuration files", self.generate_configuration_files)
         ]
-        
+
         success = True
         for task_name, task_func in tasks:
             logging.info(f"Generating {task_name}...")
             if not task_func():
                 logging.error(f"Failed to generate {task_name}")
                 success = False
-        
+
         return success
 
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="Ruuvi Home Setup File Generator")
     parser.add_argument("config", help="Configuration file (YAML or JSON)")
-    parser.add_argument("--type", choices=["python", "shell", "systemd", "config", "all"], 
+    parser.add_argument("--type", choices=["python", "shell", "systemd", "config", "all"],
                        default="all", help="Type of files to generate")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
-    
+
     args = parser.parse_args()
-    
+
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
-    
+
     config_file = Path(args.config)
     if not config_file.exists():
         logging.error(f"Configuration file not found: {config_file}")
         sys.exit(1)
-    
+
     generator = RuuviSetupGenerator(config_file)
-    
+
     # Generate requested files
     if args.type == "python":
         success = generator.generate_python_scripts()
@@ -340,7 +340,7 @@ def main():
         success = generator.generate_configuration_files()
     else:
         success = generator.generate_all()
-    
+
     if success:
         logging.info("File generation completed successfully")
         sys.exit(0)

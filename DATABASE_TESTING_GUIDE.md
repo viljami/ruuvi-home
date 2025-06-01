@@ -22,7 +22,7 @@ This guide explains how to set up PostgreSQL databases for integration testing i
    ```bash
    # macOS with Homebrew
    brew install postgresql timescaledb
-   
+
    # Ubuntu/Debian
    sudo apt-get install postgresql postgresql-contrib
    # Follow TimescaleDB installation guide for your OS

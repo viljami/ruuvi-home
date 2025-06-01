@@ -71,11 +71,11 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
   };
 
   const criticalBatterySensors = sensors.filter(s => s.battery < BATTERY_CRITICAL_THRESHOLD);
-  const lowBatterySensors = sensors.filter(s => 
+  const lowBatterySensors = sensors.filter(s =>
     s.battery >= BATTERY_CRITICAL_THRESHOLD && s.battery < BATTERY_LOW_THRESHOLD
   );
   const criticalSignalSensors = sensors.filter(s => s.rssi < SIGNAL_CRITICAL_THRESHOLD);
-  const poorSignalSensors = sensors.filter(s => 
+  const poorSignalSensors = sensors.filter(s =>
     s.rssi >= SIGNAL_CRITICAL_THRESHOLD && s.rssi < SIGNAL_POOR_THRESHOLD
   );
 
@@ -127,9 +127,9 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
 
   if (warnings.length === 0) {
     return (
-      <Alert 
-        severity="success" 
-        sx={{ 
+      <Alert
+        severity="success"
+        sx={{
           bgcolor: 'rgba(76, 175, 80, 0.1)',
           border: '1px solid rgba(76, 175, 80, 0.2)',
           color: '#ffffff',
@@ -146,12 +146,12 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
 
   const renderSensorList = (sensors: SensorReading[], warningType: string) => {
     const isExpanded = expandedWarnings.has(warningType);
-    
+
     return (
       <Box>
-        <Box 
-          display="flex" 
-          alignItems="center" 
+        <Box
+          display="flex"
+          alignItems="center"
           gap={1}
           sx={{ cursor: 'pointer' }}
           onClick={() => toggleWarningExpansion(warningType)}
@@ -163,7 +163,7 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
             {isExpanded ? <ExpandLess /> : <ExpandMore />}
           </IconButton>
         </Box>
-        
+
         <Collapse in={isExpanded}>
           <List dense sx={{ mt: 1 }}>
             {sensors.map((sensor) => (
@@ -190,7 +190,7 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
                           label={`${sensor.battery}mV`}
                           size="small"
                           variant="outlined"
-                          sx={{ 
+                          sx={{
                             fontSize: '0.7rem',
                             height: 20,
                             color: 'inherit',
@@ -203,7 +203,7 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
                           label={`${sensor.rssi}dBm`}
                           size="small"
                           variant="outlined"
-                          sx={{ 
+                          sx={{
                             fontSize: '0.7rem',
                             height: 20,
                             color: 'inherit',
@@ -243,7 +243,7 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
     <Box className={className}>
       {warnings.map((warning, index) => {
         const warningKey = `${warning.type}-${warning.severity}-${index}`;
-        
+
         return (
           <Alert
             key={warningKey}
@@ -251,11 +251,11 @@ export const WarningStatus: React.FC<WarningStatusProps> = ({
             icon={warning.icon}
             sx={{
               mb: 2,
-              bgcolor: warning.severity === 'error' 
-                ? 'rgba(244, 67, 54, 0.1)' 
+              bgcolor: warning.severity === 'error'
+                ? 'rgba(244, 67, 54, 0.1)'
                 : 'rgba(255, 152, 0, 0.1)',
-              border: warning.severity === 'error' 
-                ? '1px solid rgba(244, 67, 54, 0.2)' 
+              border: warning.severity === 'error'
+                ? '1px solid rgba(244, 67, 54, 0.2)'
                 : '1px solid rgba(255, 152, 0, 0.2)',
               color: '#ffffff',
               '& .MuiAlert-icon': {

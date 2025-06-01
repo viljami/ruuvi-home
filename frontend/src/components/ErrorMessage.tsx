@@ -141,7 +141,7 @@ const ErrorMessage: React.FC<ErrorMessageProps> = ({
       <Typography variant="body2" sx={{ mb: onRetry ? 2 : 0 }}>
         {getUserFriendlyMessage()}
       </Typography>
-      
+
       {status && (
         <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: onRetry ? 1 : 0 }}>
           Error Code: {status}

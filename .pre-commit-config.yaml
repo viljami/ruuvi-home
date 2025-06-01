@@ -12,51 +12,42 @@ repos:
       - id: check-added-large-files
       - id: mixed-line-ending
 
-  # Python formatting and linting
-  - repo: https://github.com/psf/black
-    rev: 23.9.1
-    hooks:
-      - id: black
-        files: ^docker/mqtt-simulator/.*\.py$
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        files: ^docker/mqtt-simulator/.*\.py$
-        args: ["--profile", "black"]
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-      - id: flake8
-        files: ^docker/mqtt-simulator/.*\.py$
-        args: ["--max-line-length=88", "--extend-ignore=E203,W503"]
-
-  # Rust formatting
+  # Python formatting and linting (using same Makefiles as CI)
   - repo: local
     hooks:
-      - id: rust-fmt
-        name: Rust formatting
-        entry: bash -c 'cd backend && make fmt'
+      - id: python-format
+        name: Python formatting check
+        entry: bash -c 'cd docker/mqtt-simulator && make fmt-check'
         language: system
-        files: ^backend/.*\.rs$
+        files: ^docker/mqtt-simulator/.*\.py$
         pass_filenames: false
 
-      - id: rust-clippy
-        name: Rust clippy
-        entry: bash -c 'cd backend && make clippy'
+      - id: python-lint
+        name: Python linting
+        entry: bash -c 'cd docker/mqtt-simulator && make lint'
         language: system
-        files: ^backend/.*\.rs$
+        files: ^docker/mqtt-simulator/.*\.py$
         pass_filenames: false
 
-  # Frontend formatting (if applicable)
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v3.0.3
+  # Rust formatting and linting (using same Makefiles as CI)
+  - repo: local
     hooks:
-      - id: prettier
+      - id: rust-lint
+        name: Rust linting (fmt + clippy)
+        entry: bash -c 'cd backend && make lint'
+        language: system
+        files: ^backend/.*\.rs$
+        pass_filenames: false
+
+  # Frontend formatting and build verification (using same scripts as CI)
+  - repo: local
+    hooks:
+      - id: frontend-build
+        name: Frontend build verification
+        entry: bash -c './scripts/verify-frontend-build.sh'
+        language: system
         files: ^frontend/.*\.(js|jsx|ts|tsx|json|css|scss|md)$
-        exclude: ^frontend/(node_modules|dist|build)/
+        pass_filenames: false
 
   # Docker and YAML formatting
   - repo: https://github.com/adrienverge/yamllint

@@ -117,16 +117,16 @@ verify_production_config() {
 # Function to stop any existing services
 stop_existing_services() {
     log_info "Stopping existing services..."
-    
+
     # Try both development and production compose files
     if [[ -f "$PROJECT_ROOT/docker-compose.yaml" ]]; then
         docker-compose -f "$PROJECT_ROOT/docker-compose.yaml" down --remove-orphans || true
     fi
-    
+
     if [[ -f "$COMPOSE_FILE" ]]; then
         docker-compose -f "$COMPOSE_FILE" down --remove-orphans || true
     fi
-    
+
     log_success "Existing services stopped"
 }
 
@@ -142,13 +142,13 @@ pull_images() {
 deploy_services() {
     log_info "Building and starting production services..."
     cd "$PROJECT_ROOT"
-    
+
     # Build images
     docker-compose -f "$COMPOSE_FILE" build
-    
+
     # Start services
     docker-compose -f "$COMPOSE_FILE" up -d
-    
+
     log_success "Production services started"
 }
 
@@ -156,13 +156,13 @@ deploy_services() {
 verify_deployment() {
     log_info "Verifying deployment..."
     cd "$PROJECT_ROOT"
-    
+
     # Wait a moment for services to start
     sleep 10
-    
+
     # Check service status
     docker-compose -f "$COMPOSE_FILE" ps
-    
+
     # Verify no mqtt-simulator is running
     if docker ps --format "table {{.Names}}" | grep -q "mqtt-simulator"; then
         log_error "CRITICAL: mqtt-simulator container is running in production!"
@@ -170,27 +170,27 @@ verify_deployment() {
         docker-compose -f "$COMPOSE_FILE" down
         exit 1
     fi
-    
+
     # Check if API is responding
     log_info "Waiting for API server to be ready..."
     local retry_count=0
     local max_retries=30
-    
+
     while [[ $retry_count -lt $max_retries ]]; do
         if curl -sf http://localhost:8080/health > /dev/null 2>&1; then
             log_success "API server is responding"
             break
         fi
-        
+
         ((retry_count++))
         if [[ $retry_count -eq $max_retries ]]; then
             log_error "API server did not start within expected time"
             exit 1
         fi
-        
+
         sleep 2
     done
-    
+
     log_success "Deployment verification completed"
 }
 
@@ -199,13 +199,13 @@ show_status() {
     log_info "=== Deployment Status ==="
     cd "$PROJECT_ROOT"
     docker-compose -f "$COMPOSE_FILE" ps
-    
+
     echo ""
     log_info "=== Service URLs ==="
     echo "Frontend: http://localhost:3000"
     echo "API: http://localhost:8080"
     echo "API Health: http://localhost:8080/health"
-    
+
     echo ""
     log_info "=== Logs ==="
     echo "View logs with: docker-compose -f $COMPOSE_FILE logs -f [service_name]"
@@ -215,22 +215,22 @@ show_status() {
 # Main deployment function
 main() {
     log_info "Starting Ruuvi Home production deployment for Raspberry Pi"
-    
+
     # Pre-deployment checks
     check_raspberry_pi
     check_docker
     validate_environment
     verify_production_config
-    
+
     # Deployment steps
     stop_existing_services
     pull_images
     deploy_services
     verify_deployment
-    
+
     # Post-deployment
     show_status
-    
+
     log_success "🎉 Production deployment completed successfully!"
     log_info "Your Ruuvi Home system is now running in production mode"
     log_warn "Remember: Real Ruuvi sensors must be configured to send data to this MQTT broker"

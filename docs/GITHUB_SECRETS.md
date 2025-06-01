@@ -213,7 +213,7 @@ If you have multiple Raspberry Pi devices (staging, production):
    deploy-staging:
      environment: staging
      # Uses staging secrets
-   
+
    deploy-production:
      environment: production
      # Uses production secrets

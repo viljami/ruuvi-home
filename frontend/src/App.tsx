@@ -145,14 +145,14 @@ const AppContent: React.FC = () => {
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               🏠 Ruuvi Home
             </Typography>
-            
+
             {/* Navigation Buttons */}
             <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
               <Button
                 color="inherit"
                 onClick={() => navigate('/')}
                 variant={location.pathname === '/' ? 'outlined' : 'text'}
-                sx={{ 
+                sx={{
                   borderColor: location.pathname === '/' ? 'rgba(255,255,255,0.5)' : 'transparent',
                   '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
                 }}
@@ -163,7 +163,7 @@ const AppContent: React.FC = () => {
                 color="inherit"
                 onClick={() => navigate('/dashboard')}
                 variant={location.pathname === '/dashboard' ? 'outlined' : 'text'}
-                sx={{ 
+                sx={{
                   borderColor: location.pathname === '/dashboard' ? 'rgba(255,255,255,0.5)' : 'transparent',
                   '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
                 }}
@@ -171,7 +171,7 @@ const AppContent: React.FC = () => {
                 Dashboard
               </Button>
             </Box>
-            
+
             <Typography variant="body2" sx={{ opacity: 0.8 }}>
               Sensor Monitoring Dashboard
             </Typography>
@@ -201,7 +201,7 @@ function App() {
         <Router>
           <AppContent />
         </Router>
-        
+
         {/* React Query DevTools (only in development) */}
         {process.env.NODE_ENV === 'development' && (
           <ReactQueryDevtools initialIsOpen={false} />

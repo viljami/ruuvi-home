@@ -21,7 +21,7 @@ With 10 Ruuvi sensors posting data every 10 seconds, a 5-year retention policy i
 ```
 Total readings over 5 years: 157,680,000
 ├── Per year: 31,536,000
-├── Per month: 2,628,000  
+├── Per month: 2,628,000
 ├── Per day: 86,400
 └── Per sensor per day: 8,640
 ```

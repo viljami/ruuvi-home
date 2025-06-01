@@ -127,7 +127,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             <Typography variant="body2" sx={{ mb: 2 }}>
               An unexpected error occurred in the application. You can try refreshing the page or contact support if the problem persists.
             </Typography>
-            
+
             <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
               <Button
                 variant="contained"
@@ -163,8 +163,8 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   <strong>Error:</strong> {this.state.error?.message}
                 </Typography>
                 {this.state.errorInfo && (
-                  <Typography variant="caption" component="pre" sx={{ 
-                    fontSize: '0.75rem', 
+                  <Typography variant="caption" component="pre" sx={{
+                    fontSize: '0.75rem',
                     overflow: 'auto',
                     maxHeight: 200,
                     whiteSpace: 'pre-wrap',
@@ -197,25 +197,25 @@ export const InlineError: React.FC<InlineErrorProps> = ({
 }) => {
   const getErrorMessage = () => {
     if (message) return message;
-    
+
     if (typeof error === 'string') return error;
-    
+
     if (error?.message) return error.message;
-    
+
     if (error?.status === 0) return 'Unable to connect to server';
     if (error?.status === 404) return 'Data not found';
     if (error?.status === 500) return 'Server error occurred';
-    
+
     return 'An unexpected error occurred';
   };
 
   const getTitle = () => {
     if (title) return title;
-    
+
     if (error?.status === 0) return 'Connection Error';
     if (error?.status === 404) return 'Not Found';
     if (error?.status >= 500) return 'Server Error';
-    
+
     return 'Error';
   };
 
@@ -223,7 +223,7 @@ export const InlineError: React.FC<InlineErrorProps> = ({
 
   const getIcon = () => {
     if (!showIcon) return undefined;
-    
+
     if (isNetworkError) return <WifiOff />;
     if (severity === 'warning') return <WarningIcon />;
     return <ErrorIcon />;
@@ -246,10 +246,10 @@ export const InlineError: React.FC<InlineErrorProps> = ({
   }
 
   return (
-    <Alert 
+    <Alert
       severity={severity}
       icon={getIcon()}
-      sx={{ 
+      sx={{
         my: size === 'small' ? 1 : 2,
         '& .MuiAlert-message': { width: '100%' }
       }}
@@ -258,17 +258,17 @@ export const InlineError: React.FC<InlineErrorProps> = ({
       <Typography variant="body2" sx={{ mb: onRetry ? 1 : 0 }}>
         {getErrorMessage()}
       </Typography>
-      
+
       {error?.status && (
-        <Chip 
-          label={`Error ${error.status}`} 
-          size="small" 
-          color="error" 
+        <Chip
+          label={`Error ${error.status}`}
+          size="small"
+          color="error"
           variant="outlined"
           sx={{ mt: 0.5, mr: 1 }}
         />
       )}
-      
+
       {onRetry && (
         <Button
           variant="outlined"
@@ -312,10 +312,10 @@ export const NetworkError: React.FC<NetworkErrorProps> = ({ onRetry, compact = f
 };
 
 // Data Error Component
-export const DataError: React.FC<DataErrorProps> = ({ 
-  message = 'No data available', 
-  onRetry, 
-  compact = false 
+export const DataError: React.FC<DataErrorProps> = ({
+  message = 'No data available',
+  onRetry,
+  compact = false
 }) => {
   if (compact) {
     return (
@@ -342,9 +342,9 @@ export const DataError: React.FC<DataErrorProps> = ({
 };
 
 // Loading Error Component (for when data fails to load)
-export const LoadingError: React.FC<{ onRetry?: () => void; compact?: boolean }> = ({ 
-  onRetry, 
-  compact = false 
+export const LoadingError: React.FC<{ onRetry?: () => void; compact?: boolean }> = ({
+  onRetry,
+  compact = false
 }) => {
   return (
     <InlineError
