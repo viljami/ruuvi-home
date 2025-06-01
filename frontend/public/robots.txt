@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+
+# Ruuvi Home - Private sensor monitoring application
+# Not intended for public web crawling

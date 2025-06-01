@@ -1,0 +1,19 @@
+{
+  "short_name": "Ruuvi Home",
+  "name": "Ruuvi Home - Sensor Dashboard",
+  "description": "Monitor your Ruuvi sensors in real-time with a beautiful dashboard",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#1976d2",
+  "background_color": "#f5f5f5",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "categories": [
+    "utilities",
+    "productivity",
+    "monitoring"
+  ],
+  "lang": "en",
+  "dir": "ltr"
+}
