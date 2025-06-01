@@ -17,6 +17,23 @@ jobs:
   test-backend:
     runs-on: ubuntu-latest
     name: Test Backend
+    
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg15
+        env:
+          POSTGRES_DB: ruuvi_home
+          POSTGRES_USER: ruuvi
+          POSTGRES_PASSWORD: ruuvi_secret
+          POSTGRES_HOST_AUTH_METHOD: trust
+          TIMESCALEDB_TELEMETRY: 'off'
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
 
     steps:
       - name: Checkout code
@@ -38,6 +55,8 @@ jobs:
           make lint
 
       - name: Run tests
+        env:
+          TEST_DATABASE_URL: postgresql://ruuvi:ruuvi_secret@localhost:5432/ruuvi_home
         run: |
           cd backend
           make test

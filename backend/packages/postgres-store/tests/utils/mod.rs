@@ -59,7 +59,7 @@ impl TestDatabase {
         let base_url = env::var("TEST_DATABASE_URL")
             .or_else(|_| env::var("DATABASE_URL"))
             .unwrap_or_else(|_| {
-                "postgresql://ruuvi:ruuvi_secret@localhost:5432/postgres".to_string()
+                "postgresql://ruuvi:ruuvi_secret@localhost:5432/ruuvi_home".to_string()
             });
 
         match PgPoolOptions::new()
@@ -86,7 +86,7 @@ impl TestDatabase {
         let base_url = env::var("TEST_DATABASE_URL")
             .or_else(|_| env::var("DATABASE_URL"))
             .unwrap_or_else(|_| {
-                "postgresql://ruuvi:ruuvi_secret@localhost:5432/postgres".to_string()
+                "postgresql://ruuvi:ruuvi_secret@localhost:5432/ruuvi_home".to_string()
             });
 
         // Parse the URL to extract components

@@ -37,11 +37,6 @@ fn create_test_event(sensor_mac: &str, timestamp: DateTime<Utc>) -> Event {
 
 #[tokio::test]
 async fn test_database_connection() {
-    if require_database().await.is_err() {
-        println!("Skipping test: No database available");
-        return;
-    }
-
     let test_db = TestDatabase::new()
         .await
         .expect("Failed to setup test database");
