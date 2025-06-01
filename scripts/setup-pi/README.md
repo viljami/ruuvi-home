@@ -17,6 +17,11 @@ sudo ./scripts/setup-pi/setup-pi.sh
 ### Non-Interactive Setup
 ```bash
 # GitHub Registry mode (recommended for production)
+# Repository name is auto-detected from Git remote
+export DEPLOYMENT_MODE=registry
+sudo ./scripts/setup-pi/setup-pi.sh
+
+# Manual repository override (if needed)
 export DEPLOYMENT_MODE=registry
 export GITHUB_REPO=username/ruuvi-home
 sudo ./scripts/setup-pi/setup-pi.sh
@@ -56,7 +61,7 @@ sudo ./scripts/setup-pi/setup-pi.sh
 
 # Non-interactive via environment variables
 export DEPLOYMENT_MODE=registry  # or 'local', '1', '2'
-export GITHUB_REPO=username/ruuvi-home  # required for registry mode
+# GITHUB_REPO is auto-detected from Git remote (manual override optional)
 sudo ./scripts/setup-pi/setup-pi.sh
 ```
 
@@ -92,7 +97,7 @@ sudo ./scripts/setup-pi/setup-pi.sh
 **Self-Signed Certificate:**
 ```bash
 export DEPLOYMENT_MODE=registry
-export GITHUB_REPO=username/ruuvi-home
+# GITHUB_REPO auto-detected from Git remote
 export ENABLE_HTTPS=true
 export ENABLE_LETS_ENCRYPT=false
 sudo ./scripts/setup-pi/setup-pi.sh
@@ -101,7 +106,7 @@ sudo ./scripts/setup-pi/setup-pi.sh
 **Let's Encrypt Certificate:**
 ```bash
 export DEPLOYMENT_MODE=registry
-export GITHUB_REPO=username/ruuvi-home
+# GITHUB_REPO auto-detected from Git remote
 export ENABLE_HTTPS=true
 export ENABLE_LETS_ENCRYPT=true
 export WEBHOOK_DOMAIN=webhook.yourdomain.com
@@ -359,9 +364,11 @@ The setup script supports these environment variables for non-interactive deploy
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
 | `DEPLOYMENT_MODE` | Deployment mode selection | Yes | `registry`, `local`, `1`, `2` |
-| `GITHUB_REPO` | GitHub repository for registry mode | Registry mode only | `username/ruuvi-home` |
+| `GITHUB_REPO` | GitHub repository for registry mode | Auto-detected* | `username/ruuvi-home` |
 | `GITHUB_REGISTRY` | Container registry URL | No | `ghcr.io` (default) |
 | `IMAGE_TAG` | Docker image tag to use | No | `latest` (default) |
+
+*Auto-detected from Git remote origin URL. Manual override available.
 
 ### YAML Configuration (config.yaml)
 
@@ -546,7 +553,11 @@ python3 generator.py config.yaml --type python --verbose
 
 ### Integration Testing
 ```bash
-# Full setup test - registry mode
+# Full setup test - registry mode (auto-detects repo)
+export DEPLOYMENT_MODE=registry
+sudo ./scripts/setup-pi/setup-pi.sh
+
+# Full setup test - registry mode with manual repo
 export DEPLOYMENT_MODE=registry
 export GITHUB_REPO=username/ruuvi-home
 sudo ./scripts/setup-pi/setup-pi.sh
@@ -572,8 +583,11 @@ chmod +x scripts/setup-pi/lib/*.sh
 # Check network connectivity
 ping ghcr.io
 
-# Verify repository exists
-export GITHUB_REPO=username/ruuvi-home
+# Test repository auto-detection
+./scripts/setup-pi/demo-auto-repo.sh
+
+# Verify repository exists (using auto-detected or manual)
+export GITHUB_REPO=username/ruuvi-home  # or let it auto-detect
 docker pull ghcr.io/${GITHUB_REPO}/frontend:latest
 
 # Check repository permissions (if private)
@@ -609,6 +623,9 @@ python3 -c "import yaml; yaml.safe_load(open('config.yaml'))"
 # Check deployment mode settings
 echo "DEPLOYMENT_MODE=$DEPLOYMENT_MODE"
 echo "GITHUB_REPO=$GITHUB_REPO"
+
+# Test repository detection
+./scripts/setup-pi/test-repo-detection.sh
 ```
 
 ### Log Locations

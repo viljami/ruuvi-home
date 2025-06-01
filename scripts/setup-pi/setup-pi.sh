@@ -190,11 +190,21 @@ choose_deployment_mode() {
 
         log_info "$context" "Environment variable DEPLOYMENT_MODE=$DEPLOYMENT_MODE"
 
-        # For registry mode, check if GITHUB_REPO is also set
-        if [ "$DEPLOYMENT_MODE" = "registry" ] && [ -z "$GITHUB_REPO" ]; then
-            log_error "$context" "Registry mode requires GITHUB_REPO environment variable"
-            log_error "$context" "Example: export GITHUB_REPO=username/ruuvi-home"
-            return 1
+        # For registry mode, auto-detect or validate GITHUB_REPO
+        if [ "$DEPLOYMENT_MODE" = "registry" ]; then
+            if [ -z "$GITHUB_REPO" ]; then
+                log_info "$context" "Auto-detecting GitHub repository name..."
+                if ! get_repository_name; then
+                    log_error "$context" "Registry mode requires GITHUB_REPO to be set or auto-detectable"
+                    log_error "$context" "Options:"
+                    log_error "$context" "  1. Set environment variable: export GITHUB_REPO=username/ruuvi-home"
+                    log_error "$context" "  2. Run from a Git repository with GitHub remote"
+                    log_error "$context" "  3. Switch to local mode: export DEPLOYMENT_MODE=local"
+                    return 1
+                fi
+            else
+                log_info "$context" "Using provided GITHUB_REPO: $GITHUB_REPO"
+            fi
         fi
     else
         echo -e "${COLOR_YELLOW}Choose deployment mode:${COLOR_NC}"

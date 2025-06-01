@@ -163,6 +163,99 @@ can_write_to_user_home() {
     fi
 }
 
+# Repository Detection
+detect_repository_name() {
+    local context="CONFIG"
+    local repo_name=""
+
+    log_info "$context" "Detecting repository name from Git configuration"
+
+    # Check if we're in a Git repository
+    if ! git rev-parse --git-dir >/dev/null 2>&1; then
+        log_warn "$context" "Not in a Git repository"
+        return 1
+    fi
+
+    # Get the remote origin URL
+    local remote_url=""
+    if remote_url=$(git remote get-url origin 2>/dev/null); then
+        log_info "$context" "Found Git remote origin: $remote_url"
+
+        # Parse different URL formats
+        if [[ "$remote_url" =~ ^https://github\.com/([^/]+/[^/]+)(\.git)?$ ]]; then
+            # HTTPS format: https://github.com/owner/repo.git
+            repo_name="${BASH_REMATCH[1]}"
+            repo_name="${repo_name%.git}"  # Remove .git suffix if present
+            log_success "$context" "Detected repository from HTTPS URL: $repo_name"
+        elif [[ "$remote_url" =~ ^git@github\.com:([^/]+/[^/]+)(\.git)?$ ]]; then
+            # SSH format: git@github.com:owner/repo.git
+            repo_name="${BASH_REMATCH[1]}"
+            repo_name="${repo_name%.git}"  # Remove .git suffix if present
+            log_success "$context" "Detected repository from SSH URL: $repo_name"
+        elif [[ "$remote_url" =~ github\.com[:/]([^/]+/[^/]+) ]]; then
+            # Generic GitHub URL pattern
+            repo_name="${BASH_REMATCH[1]}"
+            repo_name="${repo_name%.git}"  # Remove .git suffix if present
+            log_success "$context" "Detected repository from generic GitHub URL: $repo_name"
+        else
+            log_warn "$context" "Remote URL does not appear to be a GitHub repository: $remote_url"
+            return 1
+        fi
+    else
+        log_warn "$context" "No Git remote origin found"
+        return 1
+    fi
+
+    # Validate the repository name format
+    if [[ "$repo_name" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
+        export GITHUB_REPO="$repo_name"
+        log_success "$context" "Repository name set: $GITHUB_REPO"
+        return 0
+    else
+        log_error "$context" "Invalid repository name format: $repo_name"
+        return 1
+    fi
+}
+
+# Get repository name with fallbacks
+get_repository_name() {
+    local context="CONFIG"
+
+    # Priority order:
+    # 1. Explicitly set GITHUB_REPO environment variable
+    # 2. Auto-detected from Git repository
+    # 3. Manual input prompt (if interactive)
+
+    if [ -n "${GITHUB_REPO:-}" ]; then
+        log_info "$context" "Using explicitly set GITHUB_REPO: $GITHUB_REPO"
+        return 0
+    fi
+
+    if detect_repository_name; then
+        log_info "$context" "Auto-detected repository: $GITHUB_REPO"
+        return 0
+    fi
+
+    # If running interactively, prompt for repository name
+    if [ -t 0 ] && [ -t 1 ]; then
+        log_warn "$context" "Could not auto-detect repository name"
+        echo "Please enter your GitHub repository name (format: owner/repo):" >&2
+        read -r repo_input
+        if [[ "$repo_input" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
+            export GITHUB_REPO="$repo_input"
+            log_success "$context" "Repository name set from input: $GITHUB_REPO"
+            return 0
+        else
+            log_error "$context" "Invalid repository name format: $repo_input"
+            return 1
+        fi
+    fi
+
+    log_error "$context" "Could not determine repository name"
+    log_error "$context" "Please set GITHUB_REPO environment variable or run from Git repository"
+    return 1
+}
+
 # Database URL Construction
 construct_database_url() {
     local user="${1:-$DEFAULT_POSTGRES_USER}"
@@ -501,6 +594,11 @@ initialize_configuration() {
     # Detect network first
     detect_network_configuration
 
+    # Auto-detect repository name if not set and in registry mode
+    if [ "${DEPLOYMENT_MODE:-}" = "registry" ] && [ -z "${GITHUB_REPO:-}" ]; then
+        get_repository_name || true
+    fi
+
     # Set up derived URLs if not already set
     export DATABASE_URL="${DATABASE_URL:-$(construct_database_url)}"
     export AUTH_DATABASE_URL="${AUTH_DATABASE_URL:-$(construct_auth_database_url)}"
@@ -519,4 +617,8 @@ initialize_configuration() {
     # Set system defaults
     export TZ="${TZ:-$DEFAULT_TIMEZONE}"
     export LOG_LEVEL="${LOG_LEVEL:-$DEFAULT_LOG_LEVEL}"
+
+    # Set registry defaults
+    export GITHUB_REGISTRY="${GITHUB_REGISTRY:-ghcr.io}"
+    export IMAGE_TAG="${IMAGE_TAG:-latest}"
 }
