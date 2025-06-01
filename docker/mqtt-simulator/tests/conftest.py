@@ -1,10 +1,11 @@
 import pytest
 import os
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 # Add the parent directory to the path so we can import the simulator module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 # Set environment variables for testing
 @pytest.fixture(autouse=True)
@@ -17,9 +18,12 @@ def env_setup():
     os.environ["NUM_SENSORS"] = "2"
     yield
     # Clean up
-    for var in ["MQTT_BROKER", "MQTT_PORT", "MQTT_TOPIC", "PUBLISH_INTERVAL", "NUM_SENSORS"]:
+    env_vars = ["MQTT_BROKER", "MQTT_PORT", "MQTT_TOPIC",
+                "PUBLISH_INTERVAL", "NUM_SENSORS"]
+    for var in env_vars:
         if var in os.environ:
             del os.environ[var]
+
 
 @pytest.fixture
 def mock_mqtt_client():
@@ -31,6 +35,7 @@ def mock_mqtt_client():
     client.loop_stop.return_value = None
     client.disconnect.return_value = None
     return client
+
 
 @pytest.fixture
 def sample_ruuvi_data():
@@ -45,8 +50,13 @@ def sample_ruuvi_data():
         "battery_voltage": 3.0
     }
 
+
 # Configure pytest
 def pytest_configure(config):
     """Configure pytest"""
-    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
-    config.addinivalue_line("markers", "integration: marks tests that require external services")
+    config.addinivalue_line("markers",
+                            "slow: marks tests as slow "
+                            "(deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers",
+                            "integration: marks tests that require "
+                            "external services")

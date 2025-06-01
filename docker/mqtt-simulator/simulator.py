@@ -26,7 +26,7 @@ NUM_SENSORS = int(os.environ.get("NUM_SENSORS", 3))
 # Example Ruuvi Tag MAC addresses (fixed for simulation consistency)
 SENSOR_MACS = [
     "C6:99:AB:11:22:33",
-    "C6:99:AB:44:55:66", 
+    "C6:99:AB:44:55:66",
     "C6:99:AB:77:88:99",
     "C6:99:AB:AA:BB:CC",
     "C6:99:AB:DD:EE:FF"
@@ -38,15 +38,18 @@ GATEWAY_MAC = os.environ.get("GATEWAY_MAC", "AA:BB:CC:DD:EE:FF")
 # Global client for testing access
 client = None
 
-def create_ruuvi_data_hex(temp, humidity, pressure, accel_x, accel_y, accel_z, battery_voltage, sensor_mac):
+
+def create_ruuvi_data_hex(temp, humidity, pressure, accel_x, accel_y,
+                          accel_z, battery_voltage, sensor_mac):
     """
-    Create hex-encoded Ruuvi Data Format 5 payload compatible with ruuvitag-sensor decoder
-    
+    Create hex-encoded Ruuvi Data Format 5 payload compatible with
+    ruuvitag-sensor decoder
+
     Uses the exact format expected by ruuvitag-sensor: ">BhHHhhhHBH6B"
 
     Args:
         temp (float): Temperature in Celsius
-        humidity (float): Relative humidity percentage  
+        humidity (float): Relative humidity percentage
         pressure (float): Pressure in Pascals
         accel_x (float): X-axis acceleration in G
         accel_y (float): Y-axis acceleration in G
@@ -59,67 +62,69 @@ def create_ruuvi_data_hex(temp, humidity, pressure, accel_x, accel_y, accel_z, b
     """
     # Data format identifier
     data_format = 5
-    
+
     # Temperature (signed short, multiply by 200 for 0.005°C resolution)
     temp_raw = int(round(temp * 200))
     temp_raw = max(-32767, min(32767, temp_raw))  # Clamp to valid range
-    
+
     # Humidity (unsigned short, multiply by 400 for 0.0025% resolution)
     humidity_raw = int(round(humidity * 400))
-    humidity_raw = max(0, min(65534, humidity_raw))  # Clamp to valid range, 65535 = invalid
-    
+    humidity_raw = max(0, min(65534, humidity_raw))  # Clamp, 65535 = invalid
+
     # Pressure (unsigned short, subtract 50000 Pa offset)
     pressure_raw = int(round(pressure)) - 50000
-    pressure_raw = max(0, min(65534, pressure_raw))  # Clamp to valid range, 65535 = invalid
-    
+    pressure_raw = max(0, min(65534, pressure_raw))  # Clamp, 65535 = invalid
+
     # Acceleration X, Y, Z (signed shorts, convert G to mG)
     accel_x_raw = int(round(accel_x * 1000))
     accel_y_raw = int(round(accel_y * 1000))
     accel_z_raw = int(round(accel_z * 1000))
-    
+
     # Clamp acceleration values
     accel_x_raw = max(-32767, min(32767, accel_x_raw))
     accel_y_raw = max(-32767, min(32767, accel_y_raw))
     accel_z_raw = max(-32767, min(32767, accel_z_raw))
-    
-    # Power info (unsigned short): battery voltage (11 bits) + TX power (5 bits)
+
+    # Power info (unsigned short): battery voltage (11 bits) + TX power (5)
     tx_power = 4  # 4 dBm
-    tx_power_raw = (tx_power + 40) // 2  # Convert to raw value (offset -40dBm, 2dBm steps)
+    tx_power_raw = (tx_power + 40) // 2  # Convert (-40dBm, 2dBm steps)
     battery_mv = int(round(battery_voltage * 1000))
     battery_raw = battery_mv - 1600  # Offset -1600mV
     battery_raw = max(0, min(2047, battery_raw))  # 11 bits max
     tx_power_raw = max(0, min(31, tx_power_raw))  # 5 bits max
     power_info = (battery_raw << 5) | tx_power_raw
-    
+
     # Movement counter (unsigned byte)
     movement_counter = random.randint(0, 254)  # 255 = invalid
-    
+
     # Measurement sequence number (unsigned short)
     sequence_number = random.randint(0, 65534)  # 65535 = invalid
-    
+
     # MAC address (6 bytes)
     mac_bytes = bytes.fromhex(sensor_mac.replace(':', ''))
-    
+
     # Pack data using the exact format expected by ruuvitag-sensor decoder
-    # Format: ">BhHHhhhHBH6B" 
+    # Format: ">BhHHhhhHBH6B"
     data = struct.pack(">BhHHhhhHBH6s",
-                      data_format,
-                      temp_raw,
-                      humidity_raw, 
-                      pressure_raw,
-                      accel_x_raw,
-                      accel_y_raw,
-                      accel_z_raw,
-                      power_info,
-                      movement_counter,
-                      sequence_number,
-                      mac_bytes)
-    
+                       data_format,
+                       temp_raw,
+                       humidity_raw,
+                       pressure_raw,
+                       accel_x_raw,
+                       accel_y_raw,
+                       accel_z_raw,
+                       power_info,
+                       movement_counter,
+                       sequence_number,
+                       mac_bytes)
+
     return data.hex().upper()
+
 
 def generate_ruuvi_gateway_message(sensor_mac):
     """
-    Generate a Ruuvi Gateway MQTT message in the actual format for a specific sensor
+    Generate a Ruuvi Gateway MQTT message in the actual format for a specific
+    sensor
 
     Args:
         sensor_mac (str): MAC address of the sensor to simulate
@@ -130,11 +135,13 @@ def generate_ruuvi_gateway_message(sensor_mac):
     # Generate current unix timestamp
     current_time = int(time.time())
 
-    # Generate realistic but randomized sensor values with some sensor-specific variation
-    # Use MAC address as seed for consistent but different readings per sensor
+    # Generate realistic but randomized sensor values with some sensor-specific
+    # variation. Use MAC address as seed for consistent but different readings
+    # per sensor
     sensor_seed = hash(sensor_mac) % 1000
-    random.seed(sensor_seed + int(current_time / 10))  # Change seed every 10 seconds
-    
+    # Change seed every 10 seconds
+    random.seed(sensor_seed + int(current_time / 10))
+
     temperature = 21.0 + random.uniform(-5.0, 5.0)
     humidity = 50.0 + random.uniform(-10.0, 10.0)
     pressure = 101325 + random.uniform(-1000, 1000)
@@ -148,20 +155,22 @@ def generate_ruuvi_gateway_message(sensor_mac):
 
     # Create the manufacturer-specific data payload (24 bytes)
     payload_hex = create_ruuvi_data_hex(
-        temperature, humidity, pressure, accel_x, accel_y, accel_z, battery, sensor_mac
+        temperature, humidity, pressure, accel_x, accel_y, accel_z, battery,
+        sensor_mac
     )
-    
+
     # Wrap in BLE advertisement format for gateway message
     # Format expected by ruuvitag-sensor: length-prefixed chunks
     # Flags chunk: 02 01 06 (length=2, type=1, data=6)
     flags_chunk = "020106"
-    
+
     # Manufacturer data chunk: length + FF + 9904 + payload
     # Length = 1 (for FF) + 2 (for 9904) + payload_length
     payload_bytes = len(payload_hex) // 2
     manufacturer_data_length = 1 + 2 + payload_bytes  # FF + 9904 + payload
-    manufacturer_chunk = f"{manufacturer_data_length:02X}FF9904{payload_hex}"
-    
+    manufacturer_chunk = (f"{manufacturer_data_length:02X}FF9904"
+                          f"{payload_hex}")
+
     data_hex = flags_chunk + manufacturer_chunk
 
     # Create the gateway message
@@ -177,6 +186,7 @@ def generate_ruuvi_gateway_message(sensor_mac):
 
     return gateway_message
 
+
 def on_connect(client, userdata, flags, rc):
     """
     Callback for when the client connects to the MQTT broker
@@ -185,6 +195,7 @@ def on_connect(client, userdata, flags, rc):
         logger.info(f"Connected to MQTT broker at {MQTT_BROKER}:{MQTT_PORT}")
     else:
         logger.error(f"Failed to connect to MQTT broker, return code: {rc}")
+
 
 def main():
     """
@@ -218,9 +229,14 @@ def main():
                 result = client.publish(MQTT_TOPIC, message)
 
                 if result.rc != 0:
-                    logger.error(f"Failed to publish message, return code: {result.rc}")
+                    error_msg = (f"Failed to publish message, "
+                                 f"return code: {result.rc}")
+                    logger.error(error_msg)
                 else:
-                    logger.info(f"Published to {MQTT_TOPIC} for sensor {sensor_mac}: RSSI: {gateway_message['rssi']}, Data: {gateway_message['data'][:20]}...")
+                    log_msg = (f"Published to {MQTT_TOPIC} for sensor "
+                               f"{sensor_mac}: RSSI: {gateway_message['rssi']}"
+                               f", Data: {gateway_message['data'][:20]}...")
+                    logger.info(log_msg)
 
                 # Small delay between sensors to avoid flooding
                 time.sleep(0.5)
@@ -238,6 +254,7 @@ def main():
             client.loop_stop()
             client.disconnect()
             logger.info("Disconnected from MQTT broker")
+
 
 if __name__ == "__main__":
     main()

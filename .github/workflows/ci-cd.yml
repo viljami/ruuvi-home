@@ -187,7 +187,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
-          dockerfile: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
+          file: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
