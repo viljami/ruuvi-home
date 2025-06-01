@@ -28,7 +28,14 @@ RUN cargo build --release --bin api
 # Strip debug symbols to reduce binary size
 RUN strip target/release/api
 
-FROM gcr.io/distroless/cc-debian12
+FROM debian:bookworm-slim
+
+# Install curl for health checks and clean up
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --gid 65532 nonroot && \
+    useradd --uid 65532 --gid 65532 --home /app --shell /bin/false nonroot
 
 WORKDIR /app
 

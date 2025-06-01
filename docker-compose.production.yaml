@@ -99,6 +99,7 @@ services:
       timeout: 10s
       retries: 3
 
+
   # Frontend Web UI
   frontend:
     build:
