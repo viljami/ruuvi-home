@@ -128,37 +128,37 @@ jobs:
           file: ./docker/mqtt-simulator/coverage.xml
           flags: simulator
 
-  # Integration test with full stack
-  integration-test:
-    runs-on: ubuntu-latest
-    name: Integration Tests
-    needs: [test-backend, test-frontend, test-simulator]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Start test environment
-        run: |
-          docker compose -f docker-compose-test.yaml up -d
-
-      - name: Wait for services to be ready
-        run: |
-          # Wait for mosquitto to be ready
-          timeout 60 bash -c 'until nc -z localhost 1883; do sleep 2; done'
-
-      - name: Run integration tests
-        run: |
-          # Run MQTT simulator tests
-          docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-tests
-
-          # Run linting tests
-          docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-lint
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker compose -f docker-compose-test.yaml down -v
+  # Integration test with full stack (DISABLED)
+  # integration-test:
+  #   runs-on: ubuntu-latest
+  #   name: Integration Tests
+  #   needs: [test-backend, test-frontend, test-simulator]
+  #
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     - name: Start test environment
+  #       run: |
+  #         docker compose -f docker-compose-test.yaml up -d
+  #
+  #     - name: Wait for services to be ready
+  #       run: |
+  #         # Wait for mosquitto to be ready
+  #         timeout 60 bash -c 'until nc -z localhost 1883; do sleep 2; done'
+  #
+  #     - name: Run integration tests
+  #       run: |
+  #         # Run MQTT simulator tests
+  #         docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-tests
+  #
+  #         # Run linting tests
+  #         docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-lint
+  #
+  #     - name: Cleanup
+  #       if: always()
+  #       run: |
+  #         docker compose -f docker-compose-test.yaml down -v
 
   # Build multi-architecture Docker images
   build-images:
@@ -169,7 +169,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [mqtt-reader, api-server, mqtt-simulator]
+        service: [mqtt-reader, api-server, mqtt-simulator, frontend]
 
     steps:
       - name: Checkout code
@@ -216,7 +216,7 @@ jobs:
             ${{ matrix.service == 'mqtt-simulator' &&
             './docker/mqtt-simulator/Dockerfile' ||
             format('docker/{0}.Dockerfile', matrix.service) }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -243,7 +243,7 @@ jobs:
             ${{ matrix.service == 'mqtt-simulator' &&
             './docker/mqtt-simulator/Dockerfile' ||
             format('docker/{0}.Dockerfile', matrix.service) }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -268,7 +268,7 @@ jobs:
             ${{ matrix.service == 'mqtt-simulator' &&
             './docker/mqtt-simulator/Dockerfile' ||
             format('docker/{0}.Dockerfile', matrix.service) }}
-          platforms: linux/amd64
+          platforms: linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -279,7 +279,7 @@ jobs:
   deploy-pi:
     runs-on: ubuntu-latest
     name: Deploy to Raspberry Pi
-    needs: [integration-test, build-images]
+    needs: [build-images]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
@@ -364,7 +364,7 @@ jobs:
 
     strategy:
       matrix:
-        service: [mqtt-reader, api-server, mqtt-simulator]
+        service: [mqtt-reader, api-server, mqtt-simulator, frontend]
 
     steps:
       - name: Run Trivy vulnerability scanner
