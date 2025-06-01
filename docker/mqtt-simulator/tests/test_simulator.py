@@ -19,7 +19,7 @@ from ruuvitag_sensor.decoder import get_decoder  # noqa: E402
 @pytest.fixture
 def mqtt_client_mock():
     """Mock MQTT client for testing"""
-    with patch('simulator.mqtt.Client') as mock_client_class:
+    with patch("simulator.mqtt.Client") as mock_client_class:
         mock_client = MagicMock()
         mock_client_class.return_value = mock_client
         yield mock_client
@@ -39,7 +39,7 @@ class TestRuuviDataFormat:
             accel_y=0.0,
             accel_z=1.0,
             battery_voltage=3.0,
-            sensor_mac=test_mac
+            sensor_mac=test_mac,
         )
 
         # Check that the result is a hex string
@@ -56,17 +56,17 @@ class TestRuuviDataFormat:
         assert data_bytes[0] == 0x05, "Data format identifier incorrect"
 
         # Decode temperature (bytes 1-2, signed 16-bit integer, 0.005°C)
-        temp_raw = struct.unpack('>h', data_bytes[1:3])[0]
+        temp_raw = struct.unpack(">h", data_bytes[1:3])[0]
         temp = temp_raw * 0.005
         assert abs(temp - 21.5) < 0.01, "Temperature decoding failed"
 
         # Decode humidity (bytes 3-4, unsigned 16-bit integer, 0.0025%)
-        humidity_raw = struct.unpack('>H', data_bytes[3:5])[0]
+        humidity_raw = struct.unpack(">H", data_bytes[3:5])[0]
         humidity = humidity_raw * 0.0025
         assert abs(humidity - 50.0) < 0.01, "Humidity decoding failed"
 
         # Decode pressure (bytes 5-6, unsigned 16-bit integer, +50000 Pa)
-        pressure_raw = struct.unpack('>H', data_bytes[5:7])[0]
+        pressure_raw = struct.unpack(">H", data_bytes[5:7])[0]
         pressure = pressure_raw + 50000
         assert abs(pressure - 101325) < 10, "Pressure decoding failed"
 
@@ -82,12 +82,12 @@ class TestRuuviDataFormat:
                 accel_y=0.0,
                 accel_z=1.0,
                 battery_voltage=3.0,
-                sensor_mac=test_mac
+                sensor_mac=test_mac,
             )
 
             # Decode data
             data_bytes = bytes.fromhex(data_hex)
-            temp_raw = struct.unpack('>h', data_bytes[1:3])[0]
+            temp_raw = struct.unpack(">h", data_bytes[1:3])[0]
             decoded_temp = temp_raw * 0.005
 
             msg = f"Temperature {temp}°C not encoded/decoded correctly"
@@ -106,7 +106,7 @@ class TestRuuviDataFormat:
             accel_y=-0.05,
             accel_z=0.98,
             battery_voltage=2.95,
-            sensor_mac=test_mac
+            sensor_mac=test_mac,
         )
 
         # Test with ruuvitag-sensor decoder
@@ -115,28 +115,28 @@ class TestRuuviDataFormat:
 
         # Verify decoding was successful
         assert sensor_data is not None, "Decoder returned None"
-        assert sensor_data['data_format'] == 5, "Wrong data format"
+        assert sensor_data["data_format"] == 5, "Wrong data format"
 
         # Verify values are close to expected
         temp_msg = "Temperature mismatch"
-        assert abs(sensor_data['temperature'] - 23.45) < 0.1, temp_msg
+        assert abs(sensor_data["temperature"] - 23.45) < 0.1, temp_msg
         humidity_msg = "Humidity mismatch"
-        assert abs(sensor_data['humidity'] - 65.25) < 0.1, humidity_msg
+        assert abs(sensor_data["humidity"] - 65.25) < 0.1, humidity_msg
         pressure_msg = "Pressure mismatch"
-        assert abs(sensor_data['pressure'] - 1013.25) < 1, pressure_msg
+        assert abs(sensor_data["pressure"] - 1013.25) < 1, pressure_msg
 
         # Verify MAC address
-        expected_mac = test_mac.replace(':', '').lower()
+        expected_mac = test_mac.replace(":", "").lower()
         mac_msg = f"MAC mismatch: {sensor_data['mac']} != {expected_mac}"
-        assert sensor_data['mac'] == expected_mac, mac_msg
+        assert sensor_data["mac"] == expected_mac, mac_msg
 
         # Verify acceleration values
         accel_x_msg = "Acceleration X mismatch"
-        assert abs(sensor_data['acceleration_x'] - 100) < 5, accel_x_msg
+        assert abs(sensor_data["acceleration_x"] - 100) < 5, accel_x_msg
         accel_y_msg = "Acceleration Y mismatch"
-        assert abs(sensor_data['acceleration_y'] - (-50)) < 5, accel_y_msg
+        assert abs(sensor_data["acceleration_y"] - (-50)) < 5, accel_y_msg
         accel_z_msg = "Acceleration Z mismatch"
-        assert abs(sensor_data['acceleration_z'] - 980) < 10, accel_z_msg
+        assert abs(sensor_data["acceleration_z"] - 980) < 10, accel_z_msg
 
 
 class TestGatewayMessageGeneration:
@@ -146,9 +146,8 @@ class TestGatewayMessageGeneration:
         """Test that the generated gateway message has correct structure"""
         test_mac = "C6:99:AB:11:22:33"
         # Set fixed gateway MAC for deterministic testing
-        with patch.object(simulator, 'GATEWAY_MAC', "AA:BB:CC:DD:EE:FF"):
-            gateway_message = simulator.generate_ruuvi_gateway_message(
-                test_mac)
+        with patch.object(simulator, "GATEWAY_MAC", "AA:BB:CC:DD:EE:FF"):
+            gateway_message = simulator.generate_ruuvi_gateway_message(test_mac)
 
             # Check message structure
             assert "gw_mac" in gateway_message
@@ -185,8 +184,7 @@ class TestGatewayMessageGeneration:
         rssi_values = []
 
         for _ in range(10):
-            gateway_message = simulator.generate_ruuvi_gateway_message(
-                test_mac)
+            gateway_message = simulator.generate_ruuvi_gateway_message(test_mac)
             rssi_values.append(gateway_message["rssi"])
 
         # Check ranges
@@ -202,9 +200,10 @@ class TestGatewayMessageGeneration:
             "aoa": [],
             "gwts": 1728719836,
             "ts": 1728719836,
-            "data": ("0201061BFF9904050F18FFFFFFFFFFF0FFEC0414AA96A8DE8EF7"
-                     "97E36ED811"),
-            "coords": ""
+            "data": (
+                "0201061BFF9904050F18FFFFFFFFFFF0FFEC0414AA96A8DE8EF7" "97E36ED811"
+            ),
+            "coords": "",
         }
 
         gateway_message = simulator.generate_ruuvi_gateway_message(test_mac)
@@ -219,13 +218,13 @@ class TestGatewayMessageGeneration:
 
     def test_sensor_mac_consistency(self):
         """Test that the same sensor MAC produces consistent identifiers"""
-        test_macs = ["C6:99:AB:11:22:33", "C6:99:AB:44:55:66",
-                     "C6:99:AB:77:88:99"]
+        test_macs = ["C6:99:AB:11:22:33", "C6:99:AB:44:55:66", "C6:99:AB:77:88:99"]
 
         for test_mac in test_macs:
             # Generate multiple messages for the same sensor
-            messages = [simulator.generate_ruuvi_gateway_message(test_mac)
-                        for _ in range(3)]
+            messages = [
+                simulator.generate_ruuvi_gateway_message(test_mac) for _ in range(3)
+            ]
 
             for msg in messages:
                 data_hex = msg["data"]
@@ -238,10 +237,9 @@ class TestGatewayMessageGeneration:
                 decoder = get_decoder(5)
                 sensor_data = decoder.decode_data(sensor_payload)
 
-                expected_mac = test_mac.replace(':', '').lower()
-                mac_msg = (f"MAC mismatch for {test_mac}: "
-                           f"got {sensor_data['mac']}")
-                assert sensor_data['mac'] == expected_mac, mac_msg
+                expected_mac = test_mac.replace(":", "").lower()
+                mac_msg = f"MAC mismatch for {test_mac}: " f"got {sensor_data['mac']}"
+                assert sensor_data["mac"] == expected_mac, mac_msg
 
 
 class TestMQTTIntegration:
@@ -250,10 +248,10 @@ class TestMQTTIntegration:
     def test_mqtt_client_connection(self, mqtt_client_mock):
         """Test that the MQTT client connects correctly"""
         # Mock sys.argv to avoid actual command line args in test
-        with patch('sys.argv', ['simulator.py']):
+        with patch("sys.argv", ["simulator.py"]):
             # Run the main function with the mocked client, but stop before
             # the infinite loop
-            with patch('simulator.time.sleep', side_effect=KeyboardInterrupt):
+            with patch("simulator.time.sleep", side_effect=KeyboardInterrupt):
                 try:
                     simulator.main()
                 except KeyboardInterrupt:
@@ -278,8 +276,8 @@ class TestMQTTIntegration:
         mqtt_client_mock.publish.side_effect = mock_publish
 
         # Generate one message cycle
-        with patch('simulator.client', mqtt_client_mock):
-            with patch('simulator.time.sleep', side_effect=KeyboardInterrupt):
+        with patch("simulator.client", mqtt_client_mock):
+            with patch("simulator.time.sleep", side_effect=KeyboardInterrupt):
                 try:
                     simulator.main()
                 except KeyboardInterrupt:
@@ -295,8 +293,8 @@ class TestMQTTIntegration:
         assert published_message is not None
         try:
             data = json.loads(published_message)
-            assert 'gw_mac' in data
-            assert 'data' in data
+            assert "gw_mac" in data
+            assert "data" in data
         except json.JSONDecodeError:
             pytest.fail("Published message is not valid JSON")
 

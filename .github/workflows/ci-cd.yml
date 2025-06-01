@@ -98,13 +98,33 @@ jobs:
       - name: Install dependencies
         run: |
           cd docker/mqtt-simulator
-          pip install -r requirements.txt
-          pip install pytest pytest-cov
+          make deps
+
+      - name: Auto-format Python code
+        run: |
+          cd docker/mqtt-simulator
+          make fmt
+
+      - name: Commit formatting changes
+        if: github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add docker/mqtt-simulator/
+          if ! git diff --cached --exit-code; then
+            git commit -m "Auto-format Python code [skip ci]"
+            git push
+          fi
+
+      - name: Run code quality checks
+        run: |
+          cd docker/mqtt-simulator
+          make lint
 
       - name: Run tests
         run: |
           cd docker/mqtt-simulator
-          python -m pytest tests/ -v --cov=simulator --cov-report=xml
+          make test-cov
 
       - name: Upload coverage to Codecov
         if: github.event_name != 'pull_request'

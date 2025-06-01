@@ -65,6 +65,36 @@ make test     # run all tests
 - [ ] Define task scope explicitly
 - [ ] Plan rollback strategy
 
+## 🎨 Automatic Code Formatting
+
+**MANDATORY**: All code must be automatically formatted before commit.
+
+**One-time setup** (run once per development environment):
+```bash
+./scripts/setup-dev.sh
+```
+
+**Pre-commit hooks automatically**:
+- Format all code on every commit
+- Run linting checks  
+- Validate file structure
+- Sort imports
+- Fix trailing whitespace
+
+**Manual formatting** (if needed):
+```bash
+# Rust (backend)
+cd backend && make fmt
+
+# Python (MQTT simulator)  
+cd docker/mqtt-simulator && make fmt
+
+# All files
+pre-commit run --all-files
+```
+
+**NEVER skip formatting**: Pre-commit hooks prevent commits with formatting issues. This ensures zero formatting conflicts in CI.
+
 ### Language-Specific Validation
 
 **Rust** (backend):

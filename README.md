@@ -58,6 +58,40 @@ All code must pass validation checks including:
 - Test execution
 - Pattern validation (orphaned tags, bracket matching)
 
+### Automatic Code Formatting
+
+This project includes automatic code formatting to maintain consistent code style across all languages. The formatting is enforced through pre-commit hooks and CI/CD pipelines.
+
+**One-time setup:**
+
+```bash
+./scripts/setup-dev.sh
+```
+
+This script installs pre-commit hooks and sets up all development dependencies.
+
+**Manual formatting commands:**
+
+```bash
+# Rust (backend)
+cd backend && make fmt
+
+# Python (MQTT simulator)
+cd docker/mqtt-simulator && make fmt
+
+# All files via pre-commit
+pre-commit run --all-files
+```
+
+**Pre-commit hooks automatically:**
+- Format code on every commit
+- Run linting checks
+- Validate file structure
+- Sort imports
+- Fix trailing whitespace
+
+**Important:** Use Makefile targets (not direct tool commands) to ensure consistency between local development and CI environments.
+
 ## Project Structure
 
 ```

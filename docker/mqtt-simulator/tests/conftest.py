@@ -18,8 +18,13 @@ def env_setup():
     os.environ["NUM_SENSORS"] = "2"
     yield
     # Clean up
-    env_vars = ["MQTT_BROKER", "MQTT_PORT", "MQTT_TOPIC",
-                "PUBLISH_INTERVAL", "NUM_SENSORS"]
+    env_vars = [
+        "MQTT_BROKER",
+        "MQTT_PORT",
+        "MQTT_TOPIC",
+        "PUBLISH_INTERVAL",
+        "NUM_SENSORS",
+    ]
     for var in env_vars:
         if var in os.environ:
             del os.environ[var]
@@ -47,16 +52,16 @@ def sample_ruuvi_data():
         "accelerationX": 0.0,
         "accelerationY": 0.0,
         "accelerationZ": 1.0,
-        "battery_voltage": 3.0
+        "battery_voltage": 3.0,
     }
 
 
 # Configure pytest
 def pytest_configure(config):
     """Configure pytest"""
-    config.addinivalue_line("markers",
-                            "slow: marks tests as slow "
-                            "(deselect with '-m \"not slow\"')")
-    config.addinivalue_line("markers",
-                            "integration: marks tests that require "
-                            "external services")
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow " "(deselect with '-m \"not slow\"')"
+    )
+    config.addinivalue_line(
+        "markers", "integration: marks tests that require " "external services"
+    )

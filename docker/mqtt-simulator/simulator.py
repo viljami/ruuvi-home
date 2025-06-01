@@ -11,8 +11,7 @@ import struct
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("ruuvi-simulator")
 
@@ -29,8 +28,10 @@ SENSOR_MACS = [
     "C6:99:AB:44:55:66",
     "C6:99:AB:77:88:99",
     "C6:99:AB:AA:BB:CC",
-    "C6:99:AB:DD:EE:FF"
-][:NUM_SENSORS]  # Take only the number we need
+    "C6:99:AB:DD:EE:FF",
+][
+    :NUM_SENSORS
+]  # Take only the number we need
 
 # Gateway MAC address (bogus default for open source publication)
 GATEWAY_MAC = os.environ.get("GATEWAY_MAC", "AA:BB:CC:DD:EE:FF")
@@ -39,8 +40,9 @@ GATEWAY_MAC = os.environ.get("GATEWAY_MAC", "AA:BB:CC:DD:EE:FF")
 client = None
 
 
-def create_ruuvi_data_hex(temp, humidity, pressure, accel_x, accel_y,
-                          accel_z, battery_voltage, sensor_mac):
+def create_ruuvi_data_hex(
+    temp, humidity, pressure, accel_x, accel_y, accel_z, battery_voltage, sensor_mac
+):
     """
     Create hex-encoded Ruuvi Data Format 5 payload compatible with
     ruuvitag-sensor decoder
@@ -101,22 +103,24 @@ def create_ruuvi_data_hex(temp, humidity, pressure, accel_x, accel_y,
     sequence_number = random.randint(0, 65534)  # 65535 = invalid
 
     # MAC address (6 bytes)
-    mac_bytes = bytes.fromhex(sensor_mac.replace(':', ''))
+    mac_bytes = bytes.fromhex(sensor_mac.replace(":", ""))
 
     # Pack data using the exact format expected by ruuvitag-sensor decoder
     # Format: ">BhHHhhhHBH6B"
-    data = struct.pack(">BhHHhhhHBH6s",
-                       data_format,
-                       temp_raw,
-                       humidity_raw,
-                       pressure_raw,
-                       accel_x_raw,
-                       accel_y_raw,
-                       accel_z_raw,
-                       power_info,
-                       movement_counter,
-                       sequence_number,
-                       mac_bytes)
+    data = struct.pack(
+        ">BhHHhhhHBH6s",
+        data_format,
+        temp_raw,
+        humidity_raw,
+        pressure_raw,
+        accel_x_raw,
+        accel_y_raw,
+        accel_z_raw,
+        power_info,
+        movement_counter,
+        sequence_number,
+        mac_bytes,
+    )
 
     return data.hex().upper()
 
@@ -155,8 +159,7 @@ def generate_ruuvi_gateway_message(sensor_mac):
 
     # Create the manufacturer-specific data payload (24 bytes)
     payload_hex = create_ruuvi_data_hex(
-        temperature, humidity, pressure, accel_x, accel_y, accel_z, battery,
-        sensor_mac
+        temperature, humidity, pressure, accel_x, accel_y, accel_z, battery, sensor_mac
     )
 
     # Wrap in BLE advertisement format for gateway message
@@ -168,8 +171,7 @@ def generate_ruuvi_gateway_message(sensor_mac):
     # Length = 1 (for FF) + 2 (for 9904) + payload_length
     payload_bytes = len(payload_hex) // 2
     manufacturer_data_length = 1 + 2 + payload_bytes  # FF + 9904 + payload
-    manufacturer_chunk = (f"{manufacturer_data_length:02X}FF9904"
-                          f"{payload_hex}")
+    manufacturer_chunk = f"{manufacturer_data_length:02X}FF9904" f"{payload_hex}"
 
     data_hex = flags_chunk + manufacturer_chunk
 
@@ -181,7 +183,7 @@ def generate_ruuvi_gateway_message(sensor_mac):
         "gwts": current_time,
         "ts": current_time,
         "data": data_hex,
-        "coords": ""
+        "coords": "",
     }
 
     return gateway_message
@@ -229,13 +231,16 @@ def main():
                 result = client.publish(MQTT_TOPIC, message)
 
                 if result.rc != 0:
-                    error_msg = (f"Failed to publish message, "
-                                 f"return code: {result.rc}")
+                    error_msg = (
+                        f"Failed to publish message, " f"return code: {result.rc}"
+                    )
                     logger.error(error_msg)
                 else:
-                    log_msg = (f"Published to {MQTT_TOPIC} for sensor "
-                               f"{sensor_mac}: RSSI: {gateway_message['rssi']}"
-                               f", Data: {gateway_message['data'][:20]}...")
+                    log_msg = (
+                        f"Published to {MQTT_TOPIC} for sensor "
+                        f"{sensor_mac}: RSSI: {gateway_message['rssi']}"
+                        f", Data: {gateway_message['data'][:20]}..."
+                    )
                     logger.info(log_msg)
 
                 # Small delay between sensors to avoid flooding

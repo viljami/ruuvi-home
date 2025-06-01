@@ -1,0 +1,66 @@
+repos:
+  # General formatting and linting
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.4.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+      - id: mixed-line-ending
+
+  # Python formatting and linting
+  - repo: https://github.com/psf/black
+    rev: 23.9.1
+    hooks:
+      - id: black
+        files: ^docker/mqtt-simulator/.*\.py$
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        files: ^docker/mqtt-simulator/.*\.py$
+        args: ["--profile", "black"]
+
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        files: ^docker/mqtt-simulator/.*\.py$
+        args: ["--max-line-length=88", "--extend-ignore=E203,W503"]
+
+  # Rust formatting
+  - repo: local
+    hooks:
+      - id: rust-fmt
+        name: Rust formatting
+        entry: bash -c 'cd backend && make fmt'
+        language: system
+        files: ^backend/.*\.rs$
+        pass_filenames: false
+
+      - id: rust-clippy
+        name: Rust clippy
+        entry: bash -c 'cd backend && make clippy'
+        language: system
+        files: ^backend/.*\.rs$
+        pass_filenames: false
+
+  # Frontend formatting (if applicable)
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.0.3
+    hooks:
+      - id: prettier
+        files: ^frontend/.*\.(js|jsx|ts|tsx|json|css|scss|md)$
+        exclude: ^frontend/(node_modules|dist|build)/
+
+  # Docker and YAML formatting
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.32.0
+    hooks:
+      - id: yamllint
+        args: [-c=.yamllint.yml]

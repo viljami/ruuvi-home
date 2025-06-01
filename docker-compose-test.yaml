@@ -34,7 +34,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./docker/mqtt-simulator:/app
-    command: python -m pytest tests/ -v --cov=simulator --cov-report=term
+    command: make test
 
   # Optional: Linting service
   mqtt-simulator-lint:
@@ -44,7 +44,7 @@ services:
     container_name: ruuvi-mqtt-simulator-lint
     volumes:
       - ./docker/mqtt-simulator:/app
-    command: sh -c "flake8 simulator.py tests/ && black --check simulator.py tests/ && isort --check-only simulator.py tests/"
+    command: make lint
 
 networks:
   default:
