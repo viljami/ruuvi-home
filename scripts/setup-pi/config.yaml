@@ -1,10 +1,12 @@
 # Ruuvi Home Setup Configuration
 # This file contains all configurable parameters for the Pi setup process
 
-# User Configuration
+# User Configuration (Dynamic Detection)
+# Note: User detection is now handled by shared config library
+# This template supports override but relies on runtime detection
 user:
-  name: "{{ SUDO_USER | default('pi') }}"
-  home: "/home/{{ user.name }}"
+  name: "{{ RUUVI_USER | default(SUDO_USER) | default('auto-detect') }}"
+  home: "{{ RUUVI_HOME | default('/home/' + (RUUVI_USER | default(SUDO_USER) | default('pi'))) }}"
   shell: "/usr/bin/fish"
 
 # Project Structure

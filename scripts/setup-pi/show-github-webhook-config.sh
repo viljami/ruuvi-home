@@ -9,6 +9,11 @@ readonly PROJECT_DIR="${PROJECT_DIR:-/home/${SUDO_USER:-pi}/ruuvi-home}"
 readonly ENV_FILE="$PROJECT_DIR/.env"
 readonly SSL_CERT_PATH="$PROJECT_DIR/ssl/webhook.crt"
 
+# Source shared configuration library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib"
+source "$LIB_DIR/config.sh"
+
 # Colors for output
 readonly COLOR_GREEN='\033[0;32m'
 readonly COLOR_YELLOW='\033[1;33m'
@@ -25,48 +30,38 @@ print_header() {
 }
 
 get_pi_info() {
-    local hostname=$(hostname 2>/dev/null || echo "raspberrypi")
-    local local_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "unknown")
-    local external_ip=$(curl -s --connect-timeout 3 ifconfig.me 2>/dev/null || echo "unknown")
+    # Use shared configuration library for network detection
+    detect_network_configuration
 
     echo -e "${COLOR_CYAN}=== Raspberry Pi Information ===${COLOR_NC}"
-    echo "Hostname: $hostname"
-    echo "Local/Private IP: $local_ip"
-    echo "Public IP: $external_ip"
+    echo "Hostname: $DETECTED_HOSTNAME"
+    echo "Local/Private IP: $DETECTED_LOCAL_IP"
+    echo "Public IP: $DETECTED_EXTERNAL_IP"
 
-    # Detect network scenario
-    if [ "$external_ip" != "unknown" ] && [ "$external_ip" != "$local_ip" ]; then
-        echo -e "${COLOR_YELLOW}Network Scenario: NAT/Router (Port forwarding needed)${COLOR_NC}"
-        export NETWORK_SCENARIO="nat"
-    elif [ "$external_ip" = "$local_ip" ]; then
-        echo -e "${COLOR_GREEN}Network Scenario: Direct Internet Connection${COLOR_NC}"
-        export NETWORK_SCENARIO="direct"
-    else
-        echo -e "${COLOR_RED}Network Scenario: Unknown (Cannot determine public IP)${COLOR_NC}"
-        export NETWORK_SCENARIO="unknown"
-    fi
+    # Display network scenario using shared detection
+    case "$NETWORK_SCENARIO" in
+        "nat")
+            echo -e "${COLOR_YELLOW}Network Scenario: NAT/Router (Port forwarding needed)${COLOR_NC}"
+            ;;
+        "direct")
+            echo -e "${COLOR_GREEN}Network Scenario: Direct Internet Connection${COLOR_NC}"
+            ;;
+        *)
+            echo -e "${COLOR_RED}Network Scenario: Unknown (Cannot determine public IP)${COLOR_NC}"
+            ;;
+    esac
     echo ""
 
-    # Export for other functions
-    export PI_LOCAL_IP="$local_ip"
-    export PI_PUBLIC_IP="$external_ip"
+    # Export for other functions (maintaining compatibility)
+    export PI_LOCAL_IP="$DETECTED_LOCAL_IP"
+    export PI_PUBLIC_IP="$DETECTED_EXTERNAL_IP"
 }
 
 get_webhook_config() {
-    local webhook_port="9000"
-    local webhook_secret=""
-    local https_enabled="true"
-
-    # Read configuration from .env file
-    if [ -f "$ENV_FILE" ]; then
-        webhook_port=$(grep "WEBHOOK_PORT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 || echo "9000")
-        webhook_secret=$(grep "WEBHOOK_SECRET=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 || echo "")
-        https_enabled=$(grep "WEBHOOK_ENABLE_HTTPS=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2 || echo "true")
-    fi
-
-    export WEBHOOK_PORT="$webhook_port"
-    export WEBHOOK_SECRET="$webhook_secret"
-    export HTTPS_ENABLED="$https_enabled"
+    # Use shared configuration library for reading env vars
+    export WEBHOOK_PORT=$(read_env_var "WEBHOOK_PORT" "$ENV_FILE" "$DEFAULT_WEBHOOK_PORT")
+    export WEBHOOK_SECRET=$(read_env_var "WEBHOOK_SECRET" "$ENV_FILE" "")
+    export HTTPS_ENABLED=$(read_env_var "WEBHOOK_ENABLE_HTTPS" "$ENV_FILE" "true")
 }
 
 check_certificate_type() {
@@ -148,14 +143,13 @@ show_github_settings() {
     echo ""
 
     # Payload URL
-    local local_ip=$(hostname -I | awk '{print $1}')
     local protocol="http"
     if [ "$HTTPS_ENABLED" = "true" ]; then
         protocol="https"
     fi
 
     echo "📍 Payload URL:"
-    echo "   $protocol://$local_ip:$WEBHOOK_PORT"
+    echo "   $protocol://$DETECTED_LOCAL_IP:$WEBHOOK_PORT"
     echo ""
 
     # Content Type

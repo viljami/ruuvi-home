@@ -11,6 +11,7 @@ LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
 # Source dependencies
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
+source "$LIB_DIR/config.sh"
 
 # Module context for logging
 readonly MODULE_CONTEXT="VALIDATION"
@@ -52,25 +53,15 @@ validate_configuration() {
 validate_user_setup() {
     local context="$MODULE_CONTEXT"
 
-    log_info "$context" "Validating user setup for: $RUUVI_USER"
+    log_info "$context" "Validating user setup using shared configuration"
 
-    # Validate target user exists
-    if ! validate_user_exists "$RUUVI_USER"; then
+    # Use shared config library for user validation
+    if ! validate_user_environment; then
+        log_error "$context" "User environment validation failed"
         return 1
     fi
 
-    # Validate home directory access
-    local home_dir="/home/$RUUVI_USER"
-    if [ ! -d "$home_dir" ]; then
-        log_error "$context" "Home directory does not exist: $home_dir"
-        return 1
-    fi
-
-    if ! validate_directory_writable "$home_dir"; then
-        return 1
-    fi
-
-    log_success "$context" "User setup validation passed"
+    log_success "$context" "User setup validation completed"
     return 0
 }
 
@@ -179,7 +170,7 @@ run_validation() {
     )
 
     log_section "Pre-flight Validation"
-    log_info "$context" "Running validation for user: $RUUVI_USER"
+    log_info "$context" "Running validation for user: ${RUUVI_USER:-[detecting...]}"
 
     local step_num=1
     local total_steps=${#validation_steps[@]}

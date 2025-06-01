@@ -18,6 +18,7 @@ readonly TEMPLATE_DIR="$SCRIPT_DIR/templates"
 # Source dependencies
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
+source "$LIB_DIR/config.sh"
 
 # Generate secure passwords for services
 generate_secure_passwords() {
@@ -25,17 +26,34 @@ generate_secure_passwords() {
 
     log_info "$context" "Generating secure passwords for services"
 
-    # Generate secure random passwords
+    # Generate secure random passwords (32 bytes = 256 bits of entropy)
     export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -base64 32)}"
+    export AUTH_DB_PASSWORD="${AUTH_DB_PASSWORD:-$(openssl rand -base64 32)}"
     export MQTT_PASSWORD="${MQTT_PASSWORD:-$(openssl rand -base64 32)}"
     export WEBHOOK_SECRET="${WEBHOOK_SECRET:-$(openssl rand -base64 32)}"
 
-    # Additional derived secrets
-    export JWT_SECRET="${JWT_SECRET:-$(openssl rand -base64 32)}"
+    # Additional derived secrets (JWT requires minimum 32 characters)
+    export JWT_SECRET="${JWT_SECRET:-$(openssl rand -base64 48)}"
     export SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -base64 32)}"
 
     log_success "$context" "Secure passwords generated"
     log_info "$context" "Passwords will be saved to .env file during setup"
+}
+
+# Initialize configuration using shared library
+initialize_shared_configuration() {
+    local context="$MAIN_CONTEXT"
+
+    log_info "$context" "Initializing configuration with shared library"
+
+    # Use shared configuration library for network detection and URL construction
+    initialize_configuration
+
+    log_success "$context" "Configuration initialized"
+    log_info "$context" "Network scenario: $NETWORK_SCENARIO"
+    log_info "$context" "Public API URL: $PUBLIC_API_URL"
+    log_info "$context" "Public Frontend URL: $PUBLIC_FRONTEND_URL"
+    log_info "$context" "CORS Origins: $CORS_ALLOW_ORIGIN"
 }
 
 # Configure HTTPS settings
@@ -219,9 +237,23 @@ choose_deployment_mode() {
 
 # Load configuration variables
 load_config() {
-    # Export key variables for modules (no YAML dependency for now)
-    export RUUVI_USER="${SUDO_USER:-pi}"
-    export PROJECT_DIR="/home/$RUUVI_USER/ruuvi-home"
+    local context="$MAIN_CONTEXT"
+
+    log_info "$context" "Detecting target user for setup"
+
+    # Use robust user detection from shared config library
+    if ! detect_target_user; then
+        log_error "$context" "Failed to detect target user"
+        return 1
+    fi
+
+    # Validate user environment
+    if ! validate_user_environment; then
+        log_error "$context" "User environment validation failed"
+        return 1
+    fi
+
+    # Export key variables for modules (using detected user)
     export DATA_DIR="$PROJECT_DIR/data"
     export LOG_DIR="/var/log/ruuvi-home"
     export BACKUP_DIR="$PROJECT_DIR/backups"
@@ -306,12 +338,15 @@ print_header() {
     echo -e "${COLOR_GREEN}=====================================${COLOR_NC}"
     echo ""
 
-    log_info "$context" "Setup target user: $RUUVI_USER"
-    log_info "$context" "Project directory: $PROJECT_DIR"
     log_info "$context" "Configuration: Built-in defaults with environment overrides"
+    log_info "$context" "Target user: $RUUVI_USER"
+    log_info "$context" "Project directory: $PROJECT_DIR"
 
     # Generate secure passwords if not already provided
     generate_secure_passwords
+
+    # Initialize shared configuration with intelligent defaults
+    initialize_shared_configuration
 }
 
 # Validate script environment
