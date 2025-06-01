@@ -481,7 +481,6 @@ impl PostgresStore {
             FROM sensor_data
             WHERE sensor_mac = $1
               AND timestamp >= $2
-              AND timestamp <= $3
             GROUP BY bucket
             ORDER BY bucket
             ",
@@ -620,7 +619,6 @@ impl PostgresStore {
         let row = sqlx::query(
             r"
             SELECT
-                $1 as period_days,
                 COUNT(*) as readings_added,
                 COUNT(*)::NUMERIC / $1 as readings_per_day,
                 100.0 as storage_growth_mb,
@@ -629,7 +627,7 @@ impl PostgresStore {
             WHERE timestamp >= $2
             ",
         )
-        .bind(i64::from(days_back))
+        .bind(days_back)
         .bind(start_time)
         .fetch_one(&self.pool)
         .await?;
@@ -638,10 +636,11 @@ impl PostgresStore {
         let storage_growth_mb_bd: Option<BigDecimal> = row.get("storage_growth_mb");
         let estimated_yearly_growth_gb_bd: Option<BigDecimal> =
             row.get("estimated_yearly_growth_gb");
+        let readings_added: Option<i64> = row.get("readings_added");
 
         Ok(GrowthStatistics {
-            period_days: row.get("period_days"),
-            readings_added: row.get("readings_added"),
+            period_days: Some(days_back),
+            readings_added,
             readings_per_day: readings_per_day_bd.and_then(|bd| bd.to_f64()),
             storage_growth_mb: storage_growth_mb_bd.and_then(|bd| bd.to_f64()),
             estimated_yearly_growth_gb: estimated_yearly_growth_gb_bd.and_then(|bd| bd.to_f64()),

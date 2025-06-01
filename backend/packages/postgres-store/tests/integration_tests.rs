@@ -10,10 +10,7 @@ use postgres_store::{
 use sqlx::Row;
 
 mod utils;
-use utils::{
-    require_database,
-    TestDatabase,
-};
+use utils::TestDatabase;
 
 fn create_test_event(sensor_mac: &str, timestamp: DateTime<Utc>) -> Event {
     Event {

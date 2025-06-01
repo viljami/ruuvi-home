@@ -288,13 +288,3 @@ macro_rules! skip_if_no_db {
         }
     };
 }
-
-/// Helper function for tests to skip gracefully when DB is not available
-pub async fn require_database() -> Result<(), TestDatabaseError> {
-    if !TestDatabase::is_database_available().await {
-        return Err(TestDatabaseError::DatabaseUnavailable(
-            "Test requires PostgreSQL database but none is available".to_string(),
-        ));
-    }
-    Ok(())
-}
