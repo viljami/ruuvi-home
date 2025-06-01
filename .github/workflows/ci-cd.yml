@@ -528,14 +528,20 @@ jobs:
   security-scan-mqtt-reader:
     runs-on: ubuntu-latest
     name: Security Scan MQTT Reader
-    needs: [build-mqtt-reader]
-    if: needs.build-mqtt-reader.result == 'success'
+    needs: [build-mqtt-reader, detect-changes]
+    if: |
+      needs.build-mqtt-reader.result == 'success' && (
+        needs.detect-changes.outputs.backend == 'true' ||
+        needs.detect-changes.outputs.docker == 'true' ||
+        github.event_name == 'release' ||
+        github.event.inputs.force_build_all == 'true'
+      )
 
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-reader:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-reader:latest
           format: "sarif"
           output: "trivy-results-mqtt-reader.sarif"
 
@@ -549,14 +555,20 @@ jobs:
   security-scan-api-server:
     runs-on: ubuntu-latest
     name: Security Scan API Server
-    needs: [build-api-server]
-    if: needs.build-api-server.result == 'success'
+    needs: [build-api-server, detect-changes]
+    if: |
+      needs.build-api-server.result == 'success' && (
+        needs.detect-changes.outputs.backend == 'true' ||
+        needs.detect-changes.outputs.docker == 'true' ||
+        github.event_name == 'release' ||
+        github.event.inputs.force_build_all == 'true'
+      )
 
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-server:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-server:latest
           format: "sarif"
           output: "trivy-results-api-server.sarif"
 
@@ -570,14 +582,20 @@ jobs:
   security-scan-frontend:
     runs-on: ubuntu-latest
     name: Security Scan Frontend
-    needs: [build-frontend]
-    if: needs.build-frontend.result == 'success'
+    needs: [build-frontend, detect-changes]
+    if: |
+      needs.build-frontend.result == 'success' && (
+        needs.detect-changes.outputs.frontend == 'true' ||
+        needs.detect-changes.outputs.docker == 'true' ||
+        github.event_name == 'release' ||
+        github.event.inputs.force_build_all == 'true'
+      )
 
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest
           format: "sarif"
           output: "trivy-results-frontend.sarif"
 
@@ -591,14 +609,20 @@ jobs:
   security-scan-mqtt-simulator:
     runs-on: ubuntu-latest
     name: Security Scan MQTT Simulator
-    needs: [build-mqtt-simulator]
-    if: needs.build-mqtt-simulator.result == 'success'
+    needs: [build-mqtt-simulator, detect-changes]
+    if: |
+      needs.build-mqtt-simulator.result == 'success' && (
+        needs.detect-changes.outputs.mqtt-simulator == 'true' ||
+        needs.detect-changes.outputs.docker == 'true' ||
+        github.event_name == 'release' ||
+        github.event.inputs.force_build_all == 'true'
+      )
 
     steps:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-simulator:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-simulator:latest
           format: "sarif"
           output: "trivy-results-mqtt-simulator.sarif"
 
