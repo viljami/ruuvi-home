@@ -15,6 +15,7 @@ LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
 # Source dependencies
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
+source "$LIB_DIR/docker-compat.sh"
 
 # Service configuration
 readonly SERVICE_FILES=(
@@ -24,11 +25,26 @@ readonly SERVICE_FILES=(
 
 readonly SERVICE_DIR="/etc/systemd/system"
 
-# Install systemd service files
-install_service_files() {
+# Generate systemd service files
+generate_systemd_services() {
     local context="$MODULE_CONTEXT"
 
-    log_info "$context" "Installing systemd service files"
+    log_info "$context" "Generating systemd service files"
+
+    # Initialize Docker compatibility detection
+    if ! init_docker_compat; then
+        log_error "$context" "Docker compatibility check failed"
+        return 1
+    fi
+
+    # Validate Docker environment
+    if [ "${DOCKER_ENVIRONMENT_OK:-false}" != "true" ]; then
+        log_error "$context" "Docker environment is not ready"
+        get_docker_summary
+        return 1
+    fi
+
+    log_info "$context" "Docker compatibility validated: ${COMPOSE_COMMAND}"
 
     for service in "${SERVICE_FILES[@]}"; do
         local service_file="$SERVICE_DIR/$service"

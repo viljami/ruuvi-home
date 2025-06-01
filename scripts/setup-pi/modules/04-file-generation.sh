@@ -16,6 +16,7 @@ LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
 source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
 source "$LIB_DIR/config.sh"
+source "$LIB_DIR/docker-compat.sh"
 
 # Generate deploy webhook Python script
 generate_deploy_webhook_script() {
@@ -496,32 +497,40 @@ generate_systemd_services() {
 
     log_info "$context" "Generating systemd service files"
 
-    # Determine which compose file to use
-    local compose_file="${DOCKER_COMPOSE_FILE:-docker-compose.yaml}"
+    # Initialize Docker compatibility detection
+    if ! init_docker_compat; then
+        log_error "$context" "Docker compatibility check failed"
+        return 1
+    fi
+
+    # Validate Docker environment
+    if [ "${DOCKER_ENVIRONMENT_OK:-false}" != "true" ]; then
+        log_error "$context" "Docker environment is not ready"
+        get_docker_summary >&2
+        return 1
+    fi
+
+    # Determine compose file based on deployment mode
+    local compose_file="docker-compose.yaml"
+    if [ "${DEPLOYMENT_MODE:-local}" = "registry" ]; then
+        compose_file="docker-compose.registry.yaml"
+    fi
+
+    log_info "$context" "Docker compatibility validated: ${COMPOSE_COMMAND}"
     log_info "$context" "Using compose file: $compose_file"
     log_info "$context" "Deployment mode: ${DEPLOYMENT_MODE:-local}"
 
-    # Detect Docker Compose command and get full path
-    local docker_compose_start_cmd
-    local docker_compose_stop_cmd
-    local docker_compose_pull_cmd
+    # Use Docker compatibility system to generate commands
+    local docker_compose_start_cmd=$(compose_cmd "up -d" "$compose_file")
+    local docker_compose_stop_cmd=$(compose_cmd "down" "$compose_file")
+    local docker_compose_pull_cmd=$(compose_cmd "pull" "$compose_file")
 
-    if command -v docker-compose &> /dev/null; then
-        local compose_path=$(command -v docker-compose)
-        docker_compose_start_cmd="$compose_path -f $compose_file up -d"
-        docker_compose_stop_cmd="$compose_path -f $compose_file down"
-        docker_compose_pull_cmd="$compose_path -f $compose_file pull"
-        log_info "$context" "Using docker-compose at: $compose_path"
-    elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
-        local docker_path=$(command -v docker)
-        docker_compose_start_cmd="$docker_path compose -f $compose_file up -d"
-        docker_compose_stop_cmd="$docker_path compose -f $compose_file down"
-        docker_compose_pull_cmd="$docker_path compose -f $compose_file pull"
-        log_info "$context" "Using docker compose plugin at: $docker_path"
-    else
-        log_error "$context" "Neither docker-compose nor docker compose found"
+    if [ $? -ne 0 ]; then
+        log_error "$context" "Failed to generate Docker Compose commands"
         return 1
     fi
+
+    log_info "$context" "Generated Docker Compose commands using: ${COMPOSE_COMMAND}"
 
     # For registry mode, add image pull step
     if [ "$DEPLOYMENT_MODE" = "registry" ]; then

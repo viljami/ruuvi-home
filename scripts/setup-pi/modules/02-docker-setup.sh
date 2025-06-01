@@ -17,9 +17,9 @@ source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
 
 # Docker configuration
-readonly DOCKER_INSTALL_SCRIPT_URL="https://get.docker.com"
 readonly DOCKER_DAEMON_CONFIG="/etc/docker/daemon.json"
 readonly DOCKER_SERVICE="docker"
+readonly MIN_DOCKER_VERSION="23.0"
 
 # Check if Docker is already installed and working
 check_docker_installation() {
@@ -31,7 +31,16 @@ check_docker_installation() {
         if docker --version &> /dev/null; then
             local docker_version=$(docker --version | cut -d' ' -f3 | cut -d',' -f1)
             log_success "$context" "Docker already installed: $docker_version"
-            return 0
+
+            # Check if it's modern enough and has compose plugin
+            local version_major=$(echo "$docker_version" | cut -d'.' -f1)
+            if [ "$version_major" -ge 23 ] && docker compose version >/dev/null 2>&1; then
+                log_success "$context" "Docker is modern with compose plugin"
+                return 0
+            else
+                log_warn "$context" "Docker is outdated or missing compose plugin - will update"
+                return 1
+            fi
         else
             log_warn "$context" "Docker command found but not responding"
             return 1
@@ -42,37 +51,53 @@ check_docker_installation() {
     fi
 }
 
-# Download and execute Docker installation script
+# Install modern Docker from official repository
 install_docker_engine() {
     local context="$MODULE_CONTEXT"
-    local install_script="/tmp/get-docker.sh"
 
-    log_info "$context" "Installing Docker Engine"
+    log_info "$context" "Installing modern Docker Engine with compose plugin"
 
-    # Download installation script
-    log_debug "$context" "Downloading Docker installation script"
-    if ! curl -fsSL "$DOCKER_INSTALL_SCRIPT_URL" -o "$install_script"; then
-        log_error "$context" "Failed to download Docker installation script"
-        return 1
+    # Install prerequisites
+    apt-get update
+    apt-get install -y ca-certificates curl gnupg lsb-release
+
+    # Add Docker's official GPG key
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod a+r /etc/apt/keyrings/docker.gpg
+
+    # Determine architecture and codename
+    local arch=$(dpkg --print-architecture)
+    local codename=$(lsb_release -cs)
+
+    # For Raspberry Pi OS, use appropriate repository
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        if [ "$ID" = "raspbian" ]; then
+            codename="bookworm"  # Use stable Debian codename for Raspberry Pi OS
+            local repo_url="https://download.docker.com/linux/debian"
+        else
+            local repo_url="https://download.docker.com/linux/ubuntu"
+        fi
+    else
+        local repo_url="https://download.docker.com/linux/ubuntu"
     fi
 
-    # Verify script was downloaded
-    if [ ! -f "$install_script" ] || [ ! -s "$install_script" ]; then
-        log_error "$context" "Docker installation script is empty or missing"
-        return 1
-    fi
+    # Add Docker repository
+    echo "deb [arch=$arch signed-by=/etc/apt/keyrings/docker.gpg] $repo_url $codename stable" > /etc/apt/sources.list.d/docker.list
 
-    # Execute installation script
-    log_info "$context" "Executing Docker installation script"
-    if ! sh "$install_script"; then
-        log_error "$context" "Docker installation failed"
-        rm -f "$install_script"
-        return 1
-    fi
+    # Update package index
+    apt-get update
 
-    # Cleanup
-    rm -f "$install_script"
-    log_success "$context" "Docker Engine installation completed"
+    # Install Docker packages including compose plugin
+    apt-get install -y \
+        docker-ce \
+        docker-ce-cli \
+        containerd.io \
+        docker-buildx-plugin \
+        docker-compose-plugin
+
+    log_success "$context" "Modern Docker Engine with compose plugin installed"
     return 0
 }
 
@@ -195,11 +220,14 @@ validate_docker_installation() {
         return 1
     fi
 
-    # Check Docker Compose version
+    # Check Docker Compose plugin
     if ! docker compose version; then
-        log_error "$context" "Docker Compose version check failed"
+        log_error "$context" "Docker Compose plugin check failed"
         return 1
     fi
+
+    local compose_version=$(docker compose version --short 2>/dev/null)
+    log_success "$context" "Docker Compose plugin available: $compose_version"
 
     # Test Docker functionality with hello-world
     log_info "$context" "Testing Docker functionality"
