@@ -174,7 +174,7 @@ Type=simple
 User=$user_name
 Group=$user_name
 WorkingDirectory=$PROJECT_DIR
-ExecStart=$PROJECT_DIR/scripts/deploy-webhook.py
+ExecStart=/opt/ruuvi-home/bin/ruuvi-deploy-webhook
 Restart=always
 RestartSec=10
 Environment=PYTHONUNBUFFERED=1

@@ -1,32 +1,76 @@
-# AI Coding Guidelines
+# AI Coding Guidelines (Generic)
 
-## 🚨 CRITICAL: Rust Code Quality Enforcement
+## 🚨 CRITICAL: Code Quality Enforcement
 
-**NEVER use direct cargo commands:**
+**NEVER use direct tool commands when project has standardized workflows:**
+
+```bash
+# ❌ AVOID (examples):
+cargo clippy          # If project uses make lint
+npm run lint          # If project uses make lint
+python -m flake8      # If project uses make lint
+```
+
+**ALWAYS use project's standardized targets:**
+
+```bash
+# ✅ REQUIRED (adapt to your project):
+make lint             # Project's linting workflow
+make test             # Project's testing workflow
+make dev              # Project's development workflow
+```
+
+**Why**: Local vs CI consistency. Direct tool commands may cause failures that only appear in CI/CD.
+
+## 🚨 CRITICAL: Source Code Repository Integrity
+
+**NEVER modify files inside the source repository:**
 
 ```bash
 # ❌ FORBIDDEN:
-cargo clippy
-cargo fmt --check
-cargo test
+cat > "$PROJECT_DIR/scripts/deploy.sh" << EOF
+cat > "$PROJECT_DIR/src/generated.py" << EOF
+echo "data" > "$PROJECT_DIR/config/generated.conf"
 ```
 
-**ALWAYS use Makefile targets:**
+**ONLY acceptable repository modifications:**
+
+```bash
+# ✅ ALLOWED:
+cat > "$PROJECT_DIR/.env" << EOF              # Environment files
+cat > "$PROJECT_DIR/.env.local" << EOF        # Local config files
+cat > "$PROJECT_DIR/config.local.json" << EOF # Local configuration
+```
+
+**Generated files MUST go to system or user locations:**
 
 ```bash
 # ✅ REQUIRED:
-make lint     # fmt-check + clippy-app + clippy-test
-make dev      # lint + test (full workflow)
-make test     # run all tests
+cat > "/etc/systemd/system/service.service" << EOF     # System services
+cat > "/opt/app-name/bin/app-script" << EOF            # App-specific scripts (secure)
+cat > "/home/$USER/.config/app/config" << EOF          # User config
+cat > "/var/lib/app/generated.conf" << EOF             # Application data
+cat > "/tmp/generated-script.sh" << EOF               # Temporary files
 ```
 
-**Why**: Local vs CI consistency. Direct cargo commands cause failures that only appear in CI.
+**Security Note**: Never use `/usr/local/bin/` for application scripts - it exposes them globally.
+Use `/opt/app-name/bin/` with proper ownership (`app-user:app-user`) for security isolation.
+
+**Why**: Scripts that modify the source repository:
+
+- Create dirty git state and conflicts
+- Overwrite source code and cause data loss
+- Make the repository unreproducible
+- Break CI/CD pipelines
+- Violate the principle of immutable source code
+
+**Detection**: Any `cat >`, `echo >`, or redirection to `$PROJECT_DIR/**` (except local config files) is **FORBIDDEN**.
 
 ## 🎯 Core Principles
 
 **Explicitness**: Write code that can be understood by AI systems. No hidden dependencies.
 
-**Modularity**: Maximum 500 lines per file. Single responsibility per component.
+**Modularity**: Keep files focused and reasonably sized. Single responsibility per component.
 
 **Reversibility**: All decisions must be easily undoable. Use feature flags, configuration, interfaces.
 
@@ -56,7 +100,7 @@ make test     # run all tests
 
 **Always choose the simpler option**:
 
-- One Makefile target instead of multiple scripts
+- One build target instead of multiple scripts
 - Concise documentation over verbose explanations
 - Single source of truth over distributed information
 - Essential content only - remove nice-to-have details
@@ -67,7 +111,7 @@ make test     # run all tests
 
 ### Before Code Changes
 
-- [ ] Understand current milestone (VISION.md, MILESTONES.md)
+- [ ] Understand current project goals and milestones
 - [ ] Define task scope explicitly
 - [ ] Plan rollback strategy
 
@@ -75,10 +119,13 @@ make test     # run all tests
 
 **MANDATORY**: All code must be automatically formatted before commit.
 
-**One-time setup** (run once per development environment):
+**One-time setup** (adapt to your project):
 
 ```bash
+# Examples - adapt to your project's setup script:
 ./scripts/setup-dev.sh
+./setup.py install --dev
+npm run setup
 ```
 
 **Pre-commit hooks automatically**:
@@ -89,16 +136,17 @@ make test     # run all tests
 - Sort imports
 - Fix trailing whitespace
 
-**Manual formatting** (if needed):
+**Manual formatting** (adapt to your project):
 
 ```bash
-# Rust (backend)
-cd backend && make fmt
+# Examples - use your project's commands:
+make fmt                    # Project-wide formatting
+npm run format             # JavaScript/TypeScript
+black .                    # Python
+cargo fmt                  # Rust
+go fmt ./...               # Go
 
-# Python (MQTT simulator)
-cd docker/mqtt-simulator && make fmt
-
-# All files
+# Or run pre-commit manually:
 pre-commit run --all-files
 ```
 
@@ -106,28 +154,23 @@ pre-commit run --all-files
 
 ### Language-Specific Validation
 
-**Rust** (backend):
+Adapt these examples to your project's structure and tools:
 
 ```bash
-cd backend && make lint && make test
-```
+# Backend (adapt language and tools):
+make lint && make test
 
-**TypeScript** (frontend):
+# Frontend (adapt framework):
+npm run lint && npm test
 
-```bash
-cd frontend && npm run lint && npm test
-```
-
-**Python** (simulator):
-
-```bash
-python -m flake8 . && python -m pytest
+# Scripts/Tools (adapt language):
+flake8 . && pytest
 ```
 
 ### After Every Code Edit
 
-- [ ] **Syntax**: Language-specific check (make build, npx tsc --noEmit, etc.)
-- [ ] **Linting**: Zero warnings (make lint, npm run lint, flake8)
+- [ ] **Syntax**: Language-specific check (compile, type check, etc.)
+- [ ] **Linting**: Zero warnings using project's lint target
 - [ ] **Tests**: Relevant test suites pass
 - [ ] **Build**: Successful compilation/build
 
@@ -139,7 +182,7 @@ python -m flake8 . && python -m pytest
 
 **End-to-End Tests**: Full system testing. User journey validation.
 
-**Error Handling**: Application code must handle errors properly (no expect/unwrap). Test code can panic early for debugging.
+**Error Handling**: Application code must handle errors properly (avoid panic/crash patterns). Test code can fail fast for debugging.
 
 ## 🔄 Development Cycle
 
@@ -169,7 +212,7 @@ python -m flake8 . && python -m pytest
 
 **Dependency Management**: Explicit version pinning, regular security updates.
 
-**IDE Integration**: Configure tools to use project standards (make lint, not cargo clippy).
+**IDE Integration**: Configure tools to use project standards (project lint targets, not direct tool commands).
 
 ## 📊 Logging Standards
 
@@ -221,6 +264,13 @@ python -m flake8 . && python -m pytest
 
 **Always**: Prioritize system stability over feature delivery.
 
-## Other
+## 🛠️ Tool Preferences
 
-Favor `ripgrep` over `grep`, it is 100_000x faster, if istalled the command for ripgrep is `rg`
+When available, prefer faster modern alternatives:
+
+- `ripgrep` (`rg`) over `grep` - significantly faster
+- `fd` over `find` - faster file searching
+- `bat` over `cat` - syntax highlighting
+- `exa` over `ls` - better formatting
+
+Adapt tool preferences based on your team's standards and available tooling.

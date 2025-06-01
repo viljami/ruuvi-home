@@ -241,7 +241,7 @@ test_webhook_service() {
     # Check if webhook service is running
     if systemctl is-active ruuvi-webhook >/dev/null 2>&1; then
         log_test "PASS" "Webhook service is running"
-    elif [ -f "$PROJECT_DIR/scripts/deploy-webhook.py" ]; then
+    elif [ -f "/opt/ruuvi-home/bin/ruuvi-deploy-webhook" ]; then
         log_test "WARN" "Webhook service not running, but script exists"
     else
         log_test "FAIL" "Webhook service not found"

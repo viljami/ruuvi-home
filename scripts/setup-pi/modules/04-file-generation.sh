@@ -18,14 +18,28 @@ source "$LIB_DIR/validation.sh"
 source "$LIB_DIR/config.sh"
 source "$LIB_DIR/docker-compat.sh"
 
+# Create secure application binary directory
+create_secure_bin_directory() {
+    local bin_dir="/opt/ruuvi-home/bin"
+
+    if [ ! -d "$bin_dir" ]; then
+        # Create directory with secure permissions
+        mkdir -p "$bin_dir"
+        chown "$RUUVI_USER:$RUUVI_USER" "/opt/ruuvi-home"
+        chown "$RUUVI_USER:$RUUVI_USER" "$bin_dir"
+        chmod 755 "/opt/ruuvi-home"
+        chmod 755 "$bin_dir"
+    fi
+}
+
 # Generate deploy webhook Python script
 generate_deploy_webhook_script() {
     local context="$MODULE_CONTEXT"
-    local script_path="$PROJECT_DIR/scripts/deploy-webhook.py"
+    local script_path="/opt/ruuvi-home/bin/ruuvi-deploy-webhook"
 
     log_info "$context" "Generating deploy webhook script"
 
-    mkdir -p "$(dirname "$script_path")"
+    create_secure_bin_directory
 
     cat > "$script_path" << EOF
 #!/usr/bin/env python3
@@ -178,7 +192,7 @@ class WebhookHandler(BaseHTTPRequestHandler):
         try:
             log_webhook("Starting deployment process...")
             result = subprocess.run([
-                f'{PROJECT_DIR}/scripts/deploy.sh'
+                '/opt/ruuvi-home/bin/ruuvi-deploy'
             ], check=True, cwd=PROJECT_DIR, capture_output=True, text=True)
             log_webhook("Deployment completed successfully")
             if result.stdout:
@@ -237,11 +251,11 @@ EOF
 # Generate deployment script
 generate_deploy_script() {
     local context="$MODULE_CONTEXT"
-    local script_path="$PROJECT_DIR/scripts/deploy.sh"
+    local script_path="/opt/ruuvi-home/bin/ruuvi-deploy"
 
     log_info "$context" "Generating deployment script"
 
-    mkdir -p "$(dirname "$script_path")"
+    create_secure_bin_directory
 
     cat > "$script_path" << EOF
 #!/bin/bash
@@ -345,11 +359,11 @@ EOF
 # Generate backup script
 generate_backup_script() {
     local context="$MODULE_CONTEXT"
-    local script_path="$PROJECT_DIR/scripts/backup.sh"
+    local script_path="/opt/ruuvi-home/bin/ruuvi-backup"
 
     log_info "$context" "Generating backup script"
 
-    mkdir -p "$(dirname "$script_path")"
+    create_secure_bin_directory
 
     cat > "$script_path" << EOF
 #!/bin/bash
@@ -571,7 +585,7 @@ Type=simple
 User=${RUUVI_USER}
 Group=${RUUVI_USER}
 WorkingDirectory=${PROJECT_DIR}
-ExecStart=${PROJECT_DIR}/scripts/deploy-webhook.py
+ExecStart=/opt/ruuvi-home/bin/ruuvi-deploy-webhook
 Restart=always
 RestartSec=10
 
@@ -587,11 +601,11 @@ EOF
 # Generate health check script
 generate_health_check_script() {
     local context="$MODULE_CONTEXT"
-    local script_path="$PROJECT_DIR/scripts/health-check.py"
+    local script_path="/opt/ruuvi-home/bin/ruuvi-health-check"
 
     log_info "$context" "Generating health check script"
 
-    mkdir -p "$(dirname "$script_path")"
+    create_secure_bin_directory
 
     cat > "$script_path" << EOF
 #!/usr/bin/env python3
@@ -692,11 +706,11 @@ EOF
 # Generate monitor script
 generate_monitor_script() {
     local context="$MODULE_CONTEXT"
-    local script_path="$PROJECT_DIR/scripts/monitor.sh"
+    local script_path="/opt/ruuvi-home/bin/ruuvi-monitor"
 
     log_info "$context" "Generating monitor script"
 
-    mkdir -p "$(dirname "$script_path")"
+    create_secure_bin_directory
 
     cat > "$script_path" << EOF
 #!/bin/bash
@@ -741,11 +755,11 @@ EOF
 # Generate maintenance script
 generate_maintenance_script() {
     local context="$MODULE_CONTEXT"
-    local script_path="$PROJECT_DIR/scripts/maintenance.sh"
+    local script_path="/opt/ruuvi-home/bin/ruuvi-maintenance"
 
     log_info "$context" "Generating maintenance script"
 
-    mkdir -p "$(dirname "$script_path")"
+    create_secure_bin_directory
 
     cat > "$script_path" << EOF
 #!/bin/bash
@@ -1300,15 +1314,15 @@ set_file_permissions() {
 validate_generated_files() {
     local context="$MODULE_CONTEXT"
     local required_files=(
-        "$PROJECT_DIR/scripts/deploy-webhook.py"
-        "$PROJECT_DIR/scripts/deploy.sh"
-        "$PROJECT_DIR/scripts/backup.sh"
+        "/opt/ruuvi-home/bin/ruuvi-deploy-webhook"
+        "/opt/ruuvi-home/bin/ruuvi-deploy"
+        "/opt/ruuvi-home/bin/ruuvi-backup"
         "$PROJECT_DIR/.env"
         "/etc/systemd/system/ruuvi-home.service"
         "/etc/systemd/system/ruuvi-webhook.service"
-        "$PROJECT_DIR/scripts/health-check.py"
-        "$PROJECT_DIR/scripts/monitor.sh"
-        "$PROJECT_DIR/scripts/maintenance.sh"
+        "/opt/ruuvi-home/bin/ruuvi-health-check"
+        "/opt/ruuvi-home/bin/ruuvi-monitor"
+        "/opt/ruuvi-home/bin/ruuvi-maintenance"
     )
 
     log_info "$context" "Validating generated files"

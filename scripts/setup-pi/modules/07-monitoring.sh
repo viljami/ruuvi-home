@@ -17,9 +17,9 @@ source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
 
 # Monitoring configuration
-readonly HEALTH_CHECK_SCRIPT="$PROJECT_DIR/scripts/health-check.py"
-readonly MONITOR_SCRIPT="$PROJECT_DIR/scripts/monitor.sh"
-readonly MAINTENANCE_SCRIPT="$PROJECT_DIR/scripts/maintenance.sh"
+readonly HEALTH_CHECK_SCRIPT="/opt/ruuvi-home/bin/ruuvi-health-check"
+readonly MONITOR_SCRIPT="/opt/ruuvi-home/bin/ruuvi-monitor"
+readonly MAINTENANCE_SCRIPT="/opt/ruuvi-home/bin/ruuvi-maintenance"
 readonly MONITORING_CRON="/etc/cron.d/ruuvi-monitoring"
 readonly HEALTH_CHECK_INTERVAL="${HEALTH_CHECK_INTERVAL:-300}"
 

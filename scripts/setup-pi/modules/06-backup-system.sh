@@ -17,7 +17,7 @@ source "$LIB_DIR/logging.sh"
 source "$LIB_DIR/validation.sh"
 
 # Backup configuration
-readonly BACKUP_SCRIPT="$PROJECT_DIR/scripts/backup.sh"
+readonly BACKUP_SCRIPT="/opt/ruuvi-home/bin/ruuvi-backup"
 readonly CRON_FILE="/etc/cron.d/ruuvi-backup"
 readonly BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 readonly BACKUP_SCHEDULE="${BACKUP_SCHEDULE:-0 2 * * *}"
