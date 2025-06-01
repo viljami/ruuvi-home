@@ -125,7 +125,7 @@ jobs:
 
       - name: Start test environment
         run: |
-          docker-compose -f docker-compose-test.yaml up -d
+          docker compose -f docker-compose-test.yaml up -d
 
       - name: Wait for services to be ready
         run: |
@@ -135,15 +135,15 @@ jobs:
       - name: Run integration tests
         run: |
           # Run MQTT simulator tests
-          docker-compose -f docker-compose-test.yaml run --rm mqtt-simulator-tests
+          docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-tests
           
           # Run linting tests
-          docker-compose -f docker-compose-test.yaml run --rm mqtt-simulator-lint
+          docker compose -f docker-compose-test.yaml run --rm mqtt-simulator-lint
 
       - name: Cleanup
         if: always()
         run: |
-          docker-compose -f docker-compose-test.yaml down -v
+          docker compose -f docker-compose-test.yaml down -v
 
   # Build multi-architecture Docker images
   build-images:
@@ -187,7 +187,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator' || '.' }}
-          dockerfile: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('./docker/{0}.Dockerfile', matrix.service) }}
+          dockerfile: ${{ matrix.service == 'mqtt-simulator' && './docker/mqtt-simulator/Dockerfile' || format('docker/{0}.Dockerfile', matrix.service) }}
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -240,8 +240,8 @@ jobs:
           sed -i "s/GATEWAY_MAC=.*/GATEWAY_MAC=${GATEWAY_MAC}/" .env
 
           # Pull latest images and restart services
-          docker-compose pull
-          docker-compose up -d
+          docker compose pull
+          docker compose up -d
 
           # Verify deployment
           sleep 30
@@ -264,7 +264,7 @@ jobs:
 
           # Check service health
           ssh ${PI_USER}@${PI_HOST} "curl -f http://localhost:8080/health"
-          ssh ${PI_USER}@${PI_HOST} "docker-compose ps"
+          ssh ${PI_USER}@${PI_HOST} "docker compose ps"
 
       - name: Rollback on failure
         if: failure()
@@ -273,7 +273,7 @@ jobs:
           PI_USER: ${{ secrets.PI_USER }}
         run: |
           echo "Deployment failed, attempting rollback..."
-          ssh ${PI_USER}@${PI_HOST} "cd /home/pi/ruuvi-home && git reset --hard HEAD~1 && docker-compose up -d"
+          ssh ${PI_USER}@${PI_HOST} "cd /home/pi/ruuvi-home && git reset --hard HEAD~1 && docker compose up -d"
 
   # Security scan
   security-scan:
