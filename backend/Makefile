@@ -31,15 +31,15 @@ CLIPPY_FLAGS := -- \
 # Test flags for comprehensive testing
 TEST_FLAGS := --all-features --workspace
 
-.PHONY: all dev build release test test-release clippy clippy-fix fmt fmt-check \
+.PHONY: all dev build release test test-release clippy clippy-ci clippy-local clippy-fix fmt fmt-check \
         clean clean-all check audit security-audit cross-aarch64 cross-x86_64 \
         install install-tools help doc doc-open
 
 # Default target for development
 all: check
 
-# Development workflow - comprehensive checks
-dev: fmt-check clippy test
+# Development workflow - comprehensive checks (use CI-level strictness)
+dev: fmt-check clippy-ci test
 
 # Quick development build
 build:
@@ -60,6 +60,28 @@ test-release:
 # Run clippy with strict linting
 clippy:
 	$(CARGO) clippy --workspace --all-targets --all-features $(CLIPPY_FLAGS)
+
+# Run clippy with CI-pipeline-level strictness (matches GitHub Actions)
+clippy-ci:
+	@echo "🔍 Running CI-level clippy checks..."
+	$(CARGO) fmt --check
+	$(CARGO) clippy --workspace --all-targets --all-features -- -D warnings
+	$(CARGO) clippy --workspace --all-targets --all-features -- \
+		-D clippy::expect_used \
+		-D clippy::unwrap_used \
+		-D clippy::panic \
+		-D clippy::unimplemented \
+		-D clippy::todo \
+		-A clippy::expect_used_in_tests \
+		-A clippy::unwrap_used_in_tests
+	$(CARGO) clippy --workspace --tests --all-features -- \
+		-A clippy::expect_used \
+		-A clippy::unwrap_used \
+		-D warnings
+
+# Run local clippy script (comprehensive CI-matching checks)
+clippy-local:
+	./run-local-clippy.sh
 
 # Auto-fix clippy issues where possible
 clippy-fix:
@@ -82,8 +104,8 @@ clean-all:
 	rm -rf target/
 	$(CARGO) clean
 
-# Comprehensive check: format, clippy, build, test
-check: fmt-check clippy build test
+# Comprehensive check: format, clippy, build, test (CI-level strictness)
+check: fmt-check clippy-ci build test
 
 # Audit dependencies for security vulnerabilities
 audit:
@@ -138,6 +160,8 @@ help:
 	@echo ""
 	@echo "Quality Assurance:"
 	@echo "  clippy           - Run clippy with strict linting"
+	@echo "  clippy-ci        - Run clippy with CI-pipeline-level strictness"
+	@echo "  clippy-local     - Run comprehensive local clippy script"
 	@echo "  clippy-fix       - Auto-fix clippy issues"
 	@echo "  fmt              - Format code"
 	@echo "  fmt-check        - Check code formatting"

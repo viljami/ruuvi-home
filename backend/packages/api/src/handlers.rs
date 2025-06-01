@@ -142,6 +142,7 @@ pub async fn get_sensor_history(
                 return Err(StatusCode::BAD_REQUEST);
             }
         }
+        #[allow(clippy::arithmetic_side_effects)]
         None => Some(Utc::now() - Duration::hours(1)),
     };
 
@@ -219,6 +220,7 @@ pub async fn get_sensor_aggregates(
                 return Err(StatusCode::BAD_REQUEST);
             }
         }
+        #[allow(clippy::arithmetic_side_effects)]
         None => Utc::now() - Duration::hours(24),
     };
 
@@ -282,6 +284,7 @@ pub async fn get_sensor_aggregates(
 /// Returns `StatusCode::BAD_REQUEST` if MAC address format is invalid or date
 /// formats are invalid Returns `StatusCode::INTERNAL_SERVER_ERROR` if database
 /// query fails
+#[allow(clippy::too_many_lines)]
 pub async fn get_sensor_hourly_aggregates(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
@@ -305,6 +308,7 @@ pub async fn get_sensor_hourly_aggregates(
                 return Err(StatusCode::BAD_REQUEST);
             }
         }
+        #[allow(clippy::arithmetic_side_effects)]
         None => Utc::now() - Duration::hours(72),
     };
 
@@ -356,6 +360,7 @@ pub async fn get_sensor_hourly_aggregates(
 /// Returns `StatusCode::BAD_REQUEST` if MAC address format is invalid or date
 /// formats are invalid Returns `StatusCode::INTERNAL_SERVER_ERROR` if database
 /// query fails
+#[allow(clippy::too_many_lines)]
 pub async fn get_sensor_daily_aggregates(
     State(state): State<AppState>,
     Path(sensor_mac): Path<String>,
@@ -379,6 +384,7 @@ pub async fn get_sensor_daily_aggregates(
                 return Err(StatusCode::BAD_REQUEST);
             }
         }
+        #[allow(clippy::arithmetic_side_effects)]
         None => Utc::now() - Duration::days(30),
     };
 
@@ -449,6 +455,7 @@ pub async fn get_storage_stats(
 /// Returns `StatusCode::BAD_REQUEST` if parameters are invalid (negative, zero,
 /// or out of range) Returns `StatusCode::INTERNAL_SERVER_ERROR` if database
 /// query fails
+#[allow(clippy::too_many_lines)]
 pub async fn get_storage_estimate(
     State(state): State<AppState>,
     Query(params): Query<StorageEstimateQuery>,
@@ -568,16 +575,15 @@ mod tests {
         assert!(interval_seconds > 0);
         assert!(retention_years > 0);
         assert!(sensor_count <= 10000);
-        assert!(interval_seconds >= 1 && interval_seconds <= 86400);
+        assert!((1..=86400).contains(&interval_seconds));
         assert!(retention_years <= 100);
 
         // Invalid parameters
-        assert!(0 <= 0); // sensor_count <= 0
-        assert!(0 <= 0); // interval_seconds <= 0
-        assert!(0 <= 0); // retention_years <= 0
-        assert!(20000 > 10000); // sensor_count too high
-        assert!(100000 > 86400); // interval_seconds too high
-        assert!(200 > 100); // retention_years too high
+        // Test boundary conditions - these are compile-time constants
+        // so we just document the expected behavior
+        // sensor_count <= 0, interval_seconds <= 0, retention_years <= 0 should
+        // fail sensor_count > 10000, interval_seconds > 86400,
+        // retention_years > 100 should fail
     }
 
     #[test]

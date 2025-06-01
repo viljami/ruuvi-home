@@ -1,13 +1,14 @@
 use crate::env::from_env;
 
 #[derive(Clone)]
+#[allow(missing_debug_implementations)]
 pub struct Config {
     pub database_url: String,
 }
 
 impl Config {
     #[must_use]
-    pub fn new(database_url: String) -> Self {
+    pub const fn new(database_url: String) -> Self {
         Self { database_url }
     }
 

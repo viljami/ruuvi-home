@@ -23,12 +23,12 @@ impl AppState {
     }
 
     /// Create a new `AppState` with a provided store (for testing)
-    pub fn with_store(store: Arc<PostgresStore>) -> Self {
+    pub const fn with_store(store: Arc<PostgresStore>) -> Self {
         Self { store }
     }
 
     /// Get a reference to the store
-    pub fn store(&self) -> &Arc<PostgresStore> {
+    pub const fn store(&self) -> &Arc<PostgresStore> {
         &self.store
     }
 }
@@ -61,14 +61,14 @@ mod tests {
         assert_eq!(config.database_url, "postgresql://test");
 
         // If we reach this point, the structure is sound
-        assert!(true);
+        // Test passes if no panic occurs during state creation
     }
 
     #[test]
     fn test_app_state_debug() {
         // Test that debug formatting works without requiring a database
         let config = Config::new("postgresql://test".to_string(), 3000);
-        let debug_str = format!("{:?}", config);
+        let debug_str = format!("{config:?}");
         assert!(debug_str.contains("postgresql://test"));
         assert!(debug_str.contains("3000"));
     }

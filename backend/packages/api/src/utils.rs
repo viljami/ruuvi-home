@@ -4,13 +4,16 @@ use chrono::{
     DateTime,
     Utc,
 };
+
+// Type alias to reduce complexity
+type ParseResult = Result<DateTime<Utc>, chrono::ParseError>;
 use postgres_store::TimeInterval;
 
 /// Parse a datetime string into a `DateTime<Utc>`
 ///
 /// # Errors
 /// Returns a `chrono::ParseError` if the datetime string cannot be parsed
-pub fn parse_datetime(datetime_str: &str) -> Result<DateTime<Utc>, chrono::ParseError> {
+pub fn parse_datetime(datetime_str: &str) -> ParseResult {
     datetime_str.parse::<DateTime<Utc>>()
 }
 
@@ -64,7 +67,7 @@ pub fn sanitize_mac_for_logging(mac: &str) -> String {
 }
 
 /// Validate that a limit parameter is reasonable
-pub fn validate_limit(limit: i64) -> bool {
+pub const fn validate_limit(limit: i64) -> bool {
     limit > 0 && limit <= 10000 // Reasonable bounds
 }
 
@@ -133,7 +136,7 @@ mod tests {
 
         for datetime_str in test_cases {
             let result = parse_datetime(datetime_str);
-            assert!(result.is_err(), "Expected error for: {}", datetime_str);
+            assert!(result.is_err(), "Expected error for: {datetime_str}");
         }
     }
 
@@ -156,8 +159,7 @@ mod tests {
             assert_eq!(
                 parse_interval(interval),
                 None,
-                "Expected None for: {}",
-                interval
+                "Expected None for: {interval}"
             );
         }
     }
@@ -174,7 +176,7 @@ mod tests {
         ];
 
         for mac in valid_macs {
-            assert!(is_valid_mac_format(mac), "Expected valid for: {}", mac);
+            assert!(is_valid_mac_format(mac), "Expected valid for: {mac}");
         }
     }
 
@@ -194,7 +196,7 @@ mod tests {
         ];
 
         for mac in invalid_macs {
-            assert!(!is_valid_mac_format(mac), "Expected invalid for: {}", mac);
+            assert!(!is_valid_mac_format(mac), "Expected invalid for: {mac}");
         }
     }
 
@@ -209,7 +211,7 @@ mod tests {
         ];
 
         for mac in test_macs {
-            assert!(is_test_mac(mac), "Expected test MAC for: {}", mac);
+            assert!(is_test_mac(mac), "Expected test MAC for: {mac}");
         }
 
         // Real-looking MACs (should return false)
@@ -221,7 +223,7 @@ mod tests {
         ];
 
         for mac in real_macs {
-            assert!(!is_test_mac(mac), "Expected real MAC for: {}", mac);
+            assert!(!is_test_mac(mac), "Expected real MAC for: {mac}");
         }
     }
 
@@ -264,7 +266,7 @@ mod tests {
         assert!(!validate_limit(0));
         assert!(!validate_limit(-1));
         assert!(!validate_limit(10001));
-        assert!(!validate_limit(100000));
+        assert!(!validate_limit(100_000));
     }
 
     #[test]
@@ -278,7 +280,7 @@ mod tests {
         assert_eq!(format_duration_human(7200), "2h");
         assert_eq!(format_duration_human(86399), "23h");
         assert_eq!(format_duration_human(86400), "1d");
-        assert_eq!(format_duration_human(172800), "2d");
+        assert_eq!(format_duration_human(172_800), "2d");
     }
 
     #[test]

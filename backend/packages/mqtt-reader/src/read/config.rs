@@ -4,6 +4,7 @@ use crate::env::{
 };
 
 #[derive(Clone)]
+#[allow(missing_debug_implementations)]
 pub struct Config {
     pub mqtt_username: Option<String>,
     pub mqtt_password: Option<String>,
@@ -16,7 +17,7 @@ pub struct Config {
 impl Config {
     #[must_use]
     #[allow(clippy::too_many_arguments)] // Establish Config
-    pub fn new(
+    pub const fn new(
         mqtt_username: Option<String>,
         mqtt_password: Option<String>,
         mqtt_host: String,

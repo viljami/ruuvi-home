@@ -6,6 +6,16 @@
 use anyhow::Result;
 use postgres_store::Event;
 
+const EPSILON: f64 = 1e-10;
+
+#[allow(clippy::many_single_char_names)]
+fn assert_float_eq(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() < EPSILON,
+        "Expected {actual} to equal {expected}"
+    );
+}
+
 /// Helper to create a test event for testing
 fn create_test_event(sensor_mac: &str) -> Event {
     Event::new_with_current_time(
@@ -90,8 +100,7 @@ async fn test_interval_parsing_logic() {
     for interval in valid_intervals {
         assert!(
             api::utils::parse_interval(interval).is_some(),
-            "Failed for interval: {}",
-            interval
+            "Failed for interval: {interval}"
         );
     }
 
@@ -99,8 +108,7 @@ async fn test_interval_parsing_logic() {
     for interval in invalid_intervals {
         assert!(
             api::utils::parse_interval(interval).is_none(),
-            "Should fail for interval: {}",
-            interval
+            "Should fail for interval: {interval}"
         );
     }
 }
@@ -119,12 +127,11 @@ async fn test_parameter_validation_logic() {
     assert!(retention_years > 0 && retention_years <= 100);
 
     // Invalid parameters
-    assert!(!(0 > 0 && 0 <= 10000)); // sensor_count = 0
-    assert!(!(20000 > 0 && 20000 <= 10000)); // sensor_count too high
-    assert!(!(0 > 0 && 0 <= 86400)); // interval_seconds = 0
-    assert!(!(100000 > 0 && 100000 <= 86400)); // interval_seconds too high
-    assert!(!(0 > 0 && 0 <= 100)); // retention_years = 0
-    assert!(!(200 > 0 && 200 <= 100)); // retention_years too high
+    // Test boundary validation - these are compile-time constants
+    // so we just document the expected behavior:
+    // sensor_count = 0, sensor_count > 10000 should fail
+    // interval_seconds = 0, interval_seconds > 86400 should fail
+    // retention_years = 0, retention_years > 100 should fail
 }
 
 #[tokio::test]
@@ -173,7 +180,7 @@ async fn test_mac_address_validation_edge_cases() {
 
     for (mac, expected) in test_cases {
         let result = api::utils::is_valid_mac_format(mac);
-        assert_eq!(result, expected, "Failed for MAC: {}", mac);
+        assert_eq!(result, expected, "Failed for MAC: {mac}");
     }
 }
 
@@ -187,12 +194,12 @@ async fn test_limit_validation() {
         (0, false),
         (-1, false),
         (10001, false),
-        (100000, false),
+        (100_000, false),
     ];
 
     for (limit, expected) in test_cases {
         let result = api::utils::validate_limit(limit);
-        assert_eq!(result, expected, "Failed for limit: {}", limit);
+        assert_eq!(result, expected, "Failed for limit: {limit}");
     }
 }
 
@@ -257,9 +264,9 @@ async fn test_event_creation() {
     let event = create_test_event("AA:BB:CC:DD:EE:01");
     assert_eq!(event.sensor_mac, "AA:BB:CC:DD:EE:01");
     assert_eq!(event.gateway_mac, "FF:FF:FF:FF:FF:01");
-    assert_eq!(event.temperature, 22.5);
-    assert_eq!(event.humidity, 65.0);
-    assert_eq!(event.pressure, 1013.25);
+    assert_float_eq(event.temperature, 22.5);
+    assert_float_eq(event.humidity, 65.0);
+    assert_float_eq(event.pressure, 1013.25);
 }
 
 // Note: Full HTTP integration tests would require a test server setup

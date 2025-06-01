@@ -1,3 +1,8 @@
+// Enforce strict error handling in application code, but allow expect/unwrap in
+// tests
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+#![cfg_attr(not(test), deny(clippy::panic))]
+
 use influxdb2::FromDataPoint;
 use influxdb2_derive::WriteDataPoint;
 use serde::{
@@ -43,7 +48,7 @@ pub struct Event {
 impl Event {
     /// Create a new Event with all fields specified
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub const fn new(
         sensor_mac: String,
         gateway_mac: String,
         temperature: f64,
@@ -101,6 +106,7 @@ impl Event {
             SystemTime,
             UNIX_EPOCH,
         };
+
         #[allow(clippy::cast_possible_wrap)]
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -129,9 +135,17 @@ impl Event {
 
 #[cfg(test)]
 mod tests {
-    use serde_json;
-
     use super::*;
+
+    const EPSILON: f64 = 1e-10;
+
+    #[allow(clippy::many_single_char_names)]
+    fn assert_float_eq(actual: f64, expected: f64) {
+        assert!(
+            (actual - expected).abs() < EPSILON,
+            "Expected {actual} to equal {expected}"
+        );
+    }
 
     fn create_test_event() -> Event {
         Event::new(
@@ -149,7 +163,7 @@ mod tests {
             -20,
             1044,
             -40,
-            1640995200,
+            1_640_995_200,
         )
     }
 
@@ -159,19 +173,19 @@ mod tests {
 
         assert_eq!(event.sensor_mac, "AA:BB:CC:DD:EE:01");
         assert_eq!(event.gateway_mac, "FF:FF:FF:FF:FF:01");
-        assert_eq!(event.temperature, 22.5);
-        assert_eq!(event.humidity, 65.0);
-        assert_eq!(event.pressure, 1013.25);
+        assert_float_eq(event.temperature, 22.5);
+        assert_float_eq(event.humidity, 65.0);
+        assert_float_eq(event.pressure, 1013.25);
         assert_eq!(event.battery, 3000);
         assert_eq!(event.tx_power, 4);
         assert_eq!(event.movement_counter, 10);
         assert_eq!(event.measurement_sequence_number, 1);
-        assert_eq!(event.acceleration, 1.0);
+        assert_float_eq(event.acceleration, 1.0);
         assert_eq!(event.acceleration_x, -16);
         assert_eq!(event.acceleration_y, -20);
         assert_eq!(event.acceleration_z, 1044);
         assert_eq!(event.rssi, -40);
-        assert_eq!(event.timestamp, 1640995200);
+        assert_eq!(event.timestamp, 1_640_995_200);
     }
 
     #[test]
@@ -180,14 +194,14 @@ mod tests {
 
         assert_eq!(event.sensor_mac, "");
         assert_eq!(event.gateway_mac, "");
-        assert_eq!(event.temperature, 0.0);
-        assert_eq!(event.humidity, 0.0);
-        assert_eq!(event.pressure, 0.0);
+        assert_float_eq(event.temperature, 0.0);
+        assert_float_eq(event.humidity, 0.0);
+        assert_float_eq(event.pressure, 0.0);
         assert_eq!(event.battery, 0);
         assert_eq!(event.tx_power, 0);
         assert_eq!(event.movement_counter, 0);
         assert_eq!(event.measurement_sequence_number, 0);
-        assert_eq!(event.acceleration, 0.0);
+        assert_float_eq(event.acceleration, 0.0);
         assert_eq!(event.acceleration_x, 0);
         assert_eq!(event.acceleration_y, 0);
         assert_eq!(event.acceleration_z, 0);
@@ -197,6 +211,7 @@ mod tests {
 
     #[test]
     fn test_event_new_with_current_timestamp() {
+        #[allow(clippy::cast_possible_wrap)]
         let before = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -219,6 +234,7 @@ mod tests {
             -40,
         );
 
+        #[allow(clippy::cast_possible_wrap)]
         let after = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -227,7 +243,7 @@ mod tests {
         assert!(event.timestamp >= before);
         assert!(event.timestamp <= after);
         assert_eq!(event.sensor_mac, "AA:BB:CC:DD:EE:01");
-        assert_eq!(event.temperature, 22.5);
+        assert_float_eq(event.temperature, 22.5);
     }
 
     #[test]
@@ -243,14 +259,14 @@ mod tests {
         // Test JSON deserialization
         let deserialized: Event = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.sensor_mac, event.sensor_mac);
-        assert_eq!(deserialized.temperature, event.temperature);
+        assert_float_eq(deserialized.temperature, event.temperature);
         assert_eq!(deserialized.timestamp, event.timestamp);
     }
 
     #[test]
     fn test_event_debug() {
         let event = create_test_event();
-        let debug_str = format!("{:?}", event);
+        let debug_str = format!("{event:?}");
 
         assert!(debug_str.contains("Event"));
         assert!(debug_str.contains("sensor_mac"));
@@ -263,7 +279,7 @@ mod tests {
     fn test_event_edge_cases() {
         // Test with extreme values
         let event = Event::new(
-            "".to_string(), // Empty MAC
+            String::new(), // Empty MAC
             "FF:FF:FF:FF:FF:FF".to_string(),
             -273.15,  // Absolute zero
             0.0,      // Zero humidity
@@ -281,24 +297,28 @@ mod tests {
         );
 
         assert_eq!(event.sensor_mac, "");
-        assert_eq!(event.temperature, -273.15);
-        assert_eq!(event.acceleration, f64::INFINITY);
+        assert_float_eq(event.temperature, -273.15);
+        assert!(event.acceleration.is_infinite() && event.acceleration.is_sign_positive());
         assert_eq!(event.tx_power, i64::MIN);
         assert_eq!(event.movement_counter, i64::MAX);
     }
 
     #[test]
     fn test_event_field_modification() {
-        let mut event = Event::default();
-
-        // Test that we can modify fields
-        event.sensor_mac = "NEW:MAC:ADDRESS".to_string();
-        event.temperature = 25.0;
-        event.timestamp = 1234567890;
+        let mut event = Event {
+            sensor_mac: "NEW:MAC:ADDRESS".to_string(),
+            temperature: 25.0,
+            timestamp: 1_234_567_890,
+            ..Default::default()
+        };
 
         assert_eq!(event.sensor_mac, "NEW:MAC:ADDRESS");
-        assert_eq!(event.temperature, 25.0);
-        assert_eq!(event.timestamp, 1234567890);
+        assert_float_eq(event.temperature, 25.0);
+        assert_eq!(event.timestamp, 1_234_567_890);
+
+        // Test modification after creation
+        event.humidity = 60.0;
+        assert_float_eq(event.humidity, 60.0);
     }
 
     #[test]
@@ -319,7 +339,7 @@ mod tests {
             -5,                              // Y acceleration
             1000,                            // Z acceleration (gravity)
             -45,                             // RSSI
-            1640995200,                      // Unix timestamp
+            1_640_995_200,                   // Unix timestamp
         );
 
         // Verify all values are within expected ranges
@@ -343,9 +363,9 @@ mod tests {
         // Verify all fields match
         assert_eq!(original.sensor_mac, restored.sensor_mac);
         assert_eq!(original.gateway_mac, restored.gateway_mac);
-        assert_eq!(original.temperature, restored.temperature);
-        assert_eq!(original.humidity, restored.humidity);
-        assert_eq!(original.pressure, restored.pressure);
+        assert_float_eq(original.temperature, restored.temperature);
+        assert_float_eq(original.humidity, restored.humidity);
+        assert_float_eq(original.pressure, restored.pressure);
         assert_eq!(original.battery, restored.battery);
         assert_eq!(original.tx_power, restored.tx_power);
         assert_eq!(original.movement_counter, restored.movement_counter);
@@ -353,7 +373,7 @@ mod tests {
             original.measurement_sequence_number,
             restored.measurement_sequence_number
         );
-        assert_eq!(original.acceleration, restored.acceleration);
+        assert_float_eq(original.acceleration, restored.acceleration);
         assert_eq!(original.acceleration_x, restored.acceleration_x);
         assert_eq!(original.acceleration_y, restored.acceleration_y);
         assert_eq!(original.acceleration_z, restored.acceleration_z);
@@ -386,7 +406,7 @@ mod tests {
                 0,
                 1000,
                 -50,
-                1640995200,
+                1_640_995_200,
             );
             assert_eq!(event.sensor_mac, mac);
         }

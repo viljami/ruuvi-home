@@ -67,7 +67,7 @@ impl TestDatabase {
         let db_name = format!("test_ruuvi_{}", test_id.to_string().replace('-', "_"));
 
         // Create the test database
-        let create_db_query = format!("CREATE DATABASE \"{}\"", db_name);
+        let create_db_query = format!("CREATE DATABASE \"{db_name}\"");
         admin_pool.execute(create_db_query.as_str()).await?;
 
         // Connect to the new test database
@@ -108,14 +108,13 @@ impl TestDatabase {
     async fn cleanup_database(admin_pool: &PgPool, db_name: &str) -> Result<(), sqlx::Error> {
         // Terminate any active connections to the test database
         let terminate_connections = format!(
-            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{}' AND pid \
-             <> pg_backend_pid()",
-            db_name
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '{db_name}' \
+             AND pid <> pg_backend_pid()"
         );
         let _ = admin_pool.execute(terminate_connections.as_str()).await;
 
         // Drop the test database
-        let drop_db_query = format!("DROP DATABASE IF EXISTS \"{}\"", db_name);
+        let drop_db_query = format!("DROP DATABASE IF EXISTS \"{db_name}\"");
         admin_pool.execute(drop_db_query.as_str()).await?;
         Ok(())
     }

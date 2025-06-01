@@ -1,35 +1,74 @@
-# Clippy configuration for strict code quality standards
-# This file configures thresholds and limits for clippy lints
+# Clippy configuration for strict CI-pipeline-level code quality standards
+# This file configures thresholds and limits to match the GitHub Actions CI pipeline
 
-# Cognitive complexity threshold - lower than default (25) for better readability
-cognitive-complexity-threshold = 15
+# === COMPLEXITY THRESHOLDS (Stricter than defaults) ===
+
+# Cognitive complexity threshold - much lower than default (25) for better readability
+# CI pipeline expects highly readable code
+cognitive-complexity-threshold = 10
 
 # Type complexity threshold - lower than default (250) for simpler types
-type-complexity-threshold = 100
+# Complex types make code harder to understand and maintain
+type-complexity-threshold = 75
 
-# Maximum lines in a function - lower than default (100) for better maintainability
-too-many-lines-threshold = 60
+# Maximum lines in a function - much lower than default (100) for better maintainability
+# Forces breaking down large functions into smaller, testable units
+too-many-lines-threshold = 50
 
 # Maximum arguments in a function - lower than default (7) for better API design
-too-many-arguments-threshold = 5
+# Forces using structs or builders for complex function signatures
+too-many-arguments-threshold = 4
+
+# === PERFORMANCE THRESHOLDS ===
 
 # Trivial copy size limit - smaller than default (128) bytes for performance
-trivial-copy-size-limit = 64
+# Encourages using references for larger types
+trivial-copy-size-limit = 32
+
+# === NAMING AND STYLE THRESHOLDS ===
 
 # Single character binding names threshold - 0 means no single char names allowed
 # Exception: common iterator variables like 'i' are still allowed in specific contexts
 single-char-binding-names-threshold = 0
 
 # Literal representation threshold for large numbers
-literal-representation-threshold = 10000
+# Encourages using named constants for magic numbers
+literal-representation-threshold = 1000
 
-# Maximum number of lines for lambda expressions
-max-fn-params-bools = 2
+# Maximum number of boolean parameters (forces using structs/enums)
+max-fn-params-bools = 1
 
-# Enforce documentation for public items
-# missing-docs-in-crate-items = true
+# === DOCUMENTATION AND SAFETY ===
 
-# Arithmetic operation checks
+# Enforce documentation coverage
+missing-docs-in-crate-items = true
+
+# Don't allow certain arithmetic operations that can overflow
 arithmetic-side-effects-allowed = []
 arithmetic-side-effects-allowed-binary = []
 arithmetic-side-effects-allowed-unary = []
+
+# === ADDITIONAL STRICTNESS ===
+
+# Disallow needless raw string hashes
+max-suggested-slice-pattern-length = 2
+
+# Strict enum variant name threshold
+enum-variant-name-threshold = 3
+
+# Avoid deep nesting
+max-struct-bools = 2
+
+# === PERFORMANCE AND EFFICIENCY ===
+
+# Vec initialization threshold
+vec-box-size-threshold = 4096
+
+# Stack allocation limit
+stack-size-threshold = 512000
+
+# === ERROR HANDLING STRICTNESS ===
+
+# These settings work in conjunction with workspace lints in Cargo.toml
+# The actual expect_used/unwrap_used denial is handled at the workspace level
+# This file focuses on measurable thresholds and complexity limits

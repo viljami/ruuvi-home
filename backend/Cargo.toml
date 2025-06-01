@@ -17,21 +17,48 @@ description = "Ruuvi Gateway Home Edition for hosting on Rasperry PI sensor data
 license = "MIT"
 repository = "https://github.com/viljami/ruuvi-home"
 
-# Basic strict lints for all workspace members
+# Strict lints for all workspace members - matches CI pipeline strictness
 [workspace.lints.clippy]
-# Essential strict lints - no unwrap/expect/panic in production code
-# Note: expect_used and unwrap_used are "warn" at workspace level to allow in tests
-# Individual packages should deny these in non-test code using #![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+# === PANIC AND ERROR HANDLING (Critical for production) ===
+# These are "warn" at workspace level but denied in non-test code via #![cfg_attr]
 unwrap_used = "warn"
 expect_used = "warn"
 panic = "deny"
 unimplemented = "deny"
 todo = "deny"
+
+# === PEDANTIC LINTS (Code quality and maintainability) ===
 pedantic = { level = "deny", priority = -1 }
-must-use-candidate = "allow"
+# Allow some pedantic lints that are too noisy or not applicable
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+module_name_repetitions = "allow"
+doc_markdown = "allow"
+
+# === SPECIFIC HIGH-VALUE LINTS ===
+# Memory safety and performance
+indexing_slicing = "deny"
+arithmetic_side_effects = "warn"
+
+# Code quality
+redundant_closure_for_method_calls = "deny"
+unnecessary_wraps = "deny"
+used_underscore_binding = "deny"
+
+# Documentation and public API
+missing_const_for_fn = "warn"
 
 [workspace.lints.rust]
+# Memory safety
 unsafe_code = "forbid"
+
+# Unused code detection
+unused = { level = "deny", priority = -1 }
+dead_code = "deny"
+
+# Missing implementations
+missing_debug_implementations = "warn"
 
 # Shared dependencies for workspace
 [workspace.dependencies]

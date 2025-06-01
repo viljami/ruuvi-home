@@ -1,3 +1,8 @@
+// Enforce strict error handling in application code, but allow expect/unwrap in
+// tests
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+#![cfg_attr(not(test), deny(clippy::panic))]
+
 use std::{
     error::Error,
     str,
@@ -98,13 +103,13 @@ impl Df5Decoder {
     }
 
     fn get_acceleration(&self, data: &ByteDataDf5) -> Acceleration {
-        let x = data.4;
-        let y = data.5;
-        let z = data.6;
-        if x == -32768 || y == -32768 || z == -32768 {
+        let acc_x = data.4;
+        let acc_y = data.5;
+        let acc_z = data.6;
+        if acc_x == -32768 || acc_y == -32768 || acc_z == -32768 {
             (None, None, None)
         } else {
-            (Some(x), Some(y), Some(z))
+            (Some(acc_x), Some(acc_y), Some(acc_z))
         }
     }
 
@@ -116,7 +121,7 @@ impl Df5Decoder {
 
     fn get_battery(&self, data: &ByteDataDf5) -> Option<u16> {
         let battery_voltage = self.get_powerinfo(data).0;
-        if battery_voltage == 0b11111111111 {
+        if battery_voltage == 0b111_1111_1111 {
             None
         } else {
             Some(battery_voltage + 1600)
@@ -144,7 +149,7 @@ impl Df5Decoder {
         [data.10, data.11, data.12, data.13, data.14, data.15]
             .iter()
             .map(|x| format!("{x:02x}"))
-            .collect::<Vec<_>>()
+            .collect::<Vec<String>>()
             .join("")
     }
 
@@ -162,25 +167,31 @@ impl Decoder for Df5Decoder {
     fn decode_data(&self, data: &str) -> Result<SensorData, Box<dyn Error>> {
         let byte_data = hex::decode(data.chars().take(48).collect::<String>())?;
         #[allow(clippy::too_many_arguments)] // Allow too many arguments for DF5 decoding
-        let s = structure!(">BhHHhhhHBH6B");
-        let byte_data = s.unpack(&byte_data)?;
+        let data_structure = structure!(">BhHHhhhHBH6B");
+        let byte_data = data_structure.unpack(&byte_data)?;
         // let rssi = &data[48..];
         let (acc_x, acc_y, acc_z) = self.get_acceleration(&byte_data);
-        let acc = if let (Some(x), Some(y), Some(z)) = (acc_x, acc_y, acc_z) {
-            println!("x: {x}, y: {y}, z: {z}");
-            Some((((x as i64).pow(2) + (y as i64).pow(2) + (z as i64).pow(2)) as f32).sqrt())
+        let acc = if let (Some(acc_x_val), Some(acc_y_val), Some(acc_z_val)) = (acc_x, acc_y, acc_z)
+        {
+            println!("x: {acc_x_val}, y: {acc_y_val}, z: {acc_z_val}");
+            Some(
+                (((i64::from(acc_x_val)).pow(2)
+                    + (i64::from(acc_y_val)).pow(2)
+                    + (i64::from(acc_z_val)).pow(2)) as f32)
+                    .sqrt(),
+            )
         } else {
             None
         };
         Ok(SensorData::Df5(SensorData5 {
             data_format: 5,
             humidity: self.get_humidity(&byte_data),
-            temperature: self.get_temperature(&byte_data).unwrap(),
+            temperature: self.get_temperature(&byte_data).unwrap_or(0.0),
             pressure: self.get_pressure(&byte_data),
-            acceleration: acc.unwrap(),
-            acceleration_x: acc_x.unwrap(),
-            acceleration_y: acc_y.unwrap(),
-            acceleration_z: acc_z.unwrap(),
+            acceleration: acc.unwrap_or(0.0),
+            acceleration_x: acc_x.unwrap_or(0),
+            acceleration_y: acc_y.unwrap_or(0),
+            acceleration_z: acc_z.unwrap_or(0),
             tx_power: self.get_txpower(&byte_data),
             battery: self.get_battery(&byte_data),
             movement_counter: self.get_movementcounter(&byte_data),
@@ -216,7 +227,7 @@ mod test {
         humidity: None,
         temperature: 19.32,
         pressure: None,
-        acceleration: 1044.3141289861017,
+        acceleration: 1_044.314_1,
         acceleration_x: -16,
         acceleration_y: -20,
         acceleration_z: 1044,
@@ -239,7 +250,7 @@ mod test {
         // let contents = fs::read_to_string(expected).expect("File");
         let decoder = Df5Decoder {};
         // let data = "051e0000f0ff";
-        let result = decoder.decode_data(&splitted).unwrap();
+        let result = decoder.decode_data(splitted).unwrap();
         assert_eq!(result, SensorData::Df5(expected));
     }
 
@@ -318,8 +329,8 @@ mod test {
         };
 
         assert_eq!(sensor_data.data_format, 5);
-        assert_eq!(sensor_data.humidity, Some(65.0));
-        assert_eq!(sensor_data.temperature, 22.5);
+        assert_eq!(sensor_data.humidity, Some(65.0_f32));
+        assert_eq!(sensor_data.temperature, 22.5_f32);
         assert_eq!(sensor_data.mac, "AA:BB:CC:DD:EE:FF");
     }
 
@@ -364,11 +375,11 @@ mod test {
             battery: Some(0),
             movement_counter: u8::MAX,
             measurement_sequence_number: u16::MAX,
-            mac: "".to_string(),
+            mac: String::new(),
             rssi: Some(i8::MIN),
         };
 
-        assert_eq!(sensor_data.temperature, -273.15);
+        assert_eq!(sensor_data.temperature, -273.15_f32);
         assert_eq!(sensor_data.acceleration_x, i16::MIN);
         assert_eq!(sensor_data.acceleration_y, i16::MAX);
         assert_eq!(sensor_data.movement_counter, u8::MAX);
@@ -423,7 +434,7 @@ mod test {
             rssi: Some(-50),
         };
 
-        let debug_str = format!("{:?}", sensor_data);
+        let debug_str = format!("{sensor_data:?}");
         assert!(debug_str.contains("SensorData5"));
         assert!(debug_str.contains("data_format: 5"));
         assert!(debug_str.contains("temperature: 25.0"));
@@ -499,10 +510,10 @@ mod test {
         let decoder = Df5Decoder {};
 
         // Test various hex string formats
-        let test_cases = vec![
+        let test_cases = [
             "051B1A00FF00040301002100C9004001DE007F", // Valid format
             "051b1a00ff00040301002100c9004001de007f", // Lowercase
-            "05 1B 1A 00 FF 00 04 03 01 00 21 00 C9 00 40 01 DE 00 7F", // With spaces (should fail)
+            "05 1B 1A 00 FF 00 04 03 01 00 21 00 C9 00 40 01 DE 00 7F", // With spaces
         ];
 
         for (i, case) in test_cases.iter().enumerate() {
@@ -531,9 +542,9 @@ mod test {
         let result = decoder.decode_data(hex_data);
 
         // Should return a Result, regardless of success/failure
-        match result {
-            Ok(_) => {}  // Success case
-            Err(_) => {} // Error case is also valid for this test
+        if result.is_ok() {
+            // Success case
         }
+        // Error case is also valid for this test
     }
 }

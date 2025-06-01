@@ -14,7 +14,16 @@ use testcontainers_modules::{
     postgres,
     testcontainers::runners::AsyncRunner,
 };
-use tokio;
+
+const EPSILON: f64 = 1e-10;
+
+#[allow(clippy::many_single_char_names)]
+fn assert_float_eq(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() < EPSILON,
+        "Expected {actual} to equal {expected}"
+    );
+}
 
 /// Helper to create a test event for database writing tests
 fn create_test_event(sensor_mac: &str) -> Event {
@@ -114,14 +123,14 @@ async fn test_event_creation_and_validation() {
 
     assert_eq!(event.sensor_mac, "AA:BB:CC:DD:EE:01");
     assert_eq!(event.gateway_mac, "FF:FF:FF:FF:FF:01");
-    assert_eq!(event.temperature, 22.5);
-    assert_eq!(event.humidity, 65.0);
-    assert_eq!(event.pressure, 1013.25);
+    assert_float_eq(event.temperature, 22.5);
+    assert_float_eq(event.humidity, 65.0);
+    assert_float_eq(event.pressure, 1013.25);
     assert_eq!(event.battery, 3000);
     assert_eq!(event.tx_power, 4);
     assert_eq!(event.movement_counter, 10);
     assert_eq!(event.measurement_sequence_number, 1);
-    assert_eq!(event.acceleration, 1.0);
+    assert_float_eq(event.acceleration, 1.0);
     assert_eq!(event.acceleration_x, -16);
     assert_eq!(event.acceleration_y, -20);
     assert_eq!(event.acceleration_z, 1044);
@@ -133,9 +142,9 @@ async fn test_multiple_events_creation() {
     let events = create_multiple_test_events();
     assert_eq!(events.len(), 3);
 
-    assert_eq!(events[0].sensor_mac, "AA:BB:CC:DD:EE:01");
-    assert_eq!(events[1].sensor_mac, "AA:BB:CC:DD:EE:02");
-    assert_eq!(events[2].sensor_mac, "AA:BB:CC:DD:EE:03");
+    assert_eq!(events.first().unwrap().sensor_mac, "AA:BB:CC:DD:EE:01");
+    assert_eq!(events.get(1).unwrap().sensor_mac, "AA:BB:CC:DD:EE:02");
+    assert_eq!(events.get(2).unwrap().sensor_mac, "AA:BB:CC:DD:EE:03");
 
     // All events should have the same gateway MAC
     for event in &events {
@@ -148,9 +157,9 @@ async fn test_custom_event_creation() {
     let event = create_custom_test_event("CUSTOM:MAC", 25.0, 45.0, 1020.0);
 
     assert_eq!(event.sensor_mac, "CUSTOM:MAC");
-    assert_eq!(event.temperature, 25.0);
-    assert_eq!(event.humidity, 45.0);
-    assert_eq!(event.pressure, 1020.0);
+    assert_float_eq(event.temperature, 25.0);
+    assert_float_eq(event.humidity, 45.0);
+    assert_float_eq(event.pressure, 1020.0);
 }
 
 #[tokio::test]
@@ -183,8 +192,8 @@ async fn test_event_edge_values() {
     );
 
     assert_eq!(event.sensor_mac, "EDGE:TEST");
-    assert_eq!(event.temperature, -40.0);
-    assert_eq!(event.humidity, 0.0);
+    assert_float_eq(event.temperature, -40.0);
+    assert_float_eq(event.humidity, 0.0);
     assert_eq!(event.battery, 0);
     assert_eq!(event.movement_counter, 255);
     assert_eq!(event.measurement_sequence_number, 65535);
@@ -324,7 +333,7 @@ async fn test_postgres_writer_large_batch() -> Result<()> {
     // Create a large batch of events
     let mut events = Vec::new();
     for i in 0..100 {
-        let mac = format!("BATCH:{:03}:TEST", i);
+        let mac = format!("BATCH:{i:03}:TEST");
         events.push(create_test_event(&mac));
     }
 
@@ -418,9 +427,9 @@ async fn test_event_data_integrity() {
 
     assert_eq!(original_event.sensor_mac, cloned_event.sensor_mac);
     assert_eq!(original_event.gateway_mac, cloned_event.gateway_mac);
-    assert_eq!(original_event.temperature, cloned_event.temperature);
-    assert_eq!(original_event.humidity, cloned_event.humidity);
-    assert_eq!(original_event.pressure, cloned_event.pressure);
+    assert_float_eq(original_event.temperature, cloned_event.temperature);
+    assert_float_eq(original_event.humidity, cloned_event.humidity);
+    assert_float_eq(original_event.pressure, cloned_event.pressure);
     assert_eq!(original_event.battery, cloned_event.battery);
     assert_eq!(original_event.tx_power, cloned_event.tx_power);
     assert_eq!(
@@ -431,7 +440,7 @@ async fn test_event_data_integrity() {
         original_event.measurement_sequence_number,
         cloned_event.measurement_sequence_number
     );
-    assert_eq!(original_event.acceleration, cloned_event.acceleration);
+    assert_float_eq(original_event.acceleration, cloned_event.acceleration);
     assert_eq!(original_event.acceleration_x, cloned_event.acceleration_x);
     assert_eq!(original_event.acceleration_y, cloned_event.acceleration_y);
     assert_eq!(original_event.acceleration_z, cloned_event.acceleration_z);

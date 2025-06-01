@@ -24,7 +24,7 @@ pub struct StorageEstimateQuery {
 }
 
 impl HistoricalQuery {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             start: None,
             end: None,
@@ -45,7 +45,7 @@ impl HistoricalQuery {
     }
 
     #[must_use]
-    pub fn with_limit(mut self, limit: i64) -> Self {
+    pub const fn with_limit(mut self, limit: i64) -> Self {
         self.limit = Some(limit);
         self
     }
@@ -58,7 +58,7 @@ impl Default for HistoricalQuery {
 }
 
 impl TimeBucketQuery {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             start: None,
             end: None,
@@ -92,7 +92,7 @@ impl Default for TimeBucketQuery {
 }
 
 impl StorageEstimateQuery {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             sensor_count: None,
             interval_seconds: None,
@@ -101,19 +101,19 @@ impl StorageEstimateQuery {
     }
 
     #[must_use]
-    pub fn with_sensor_count(mut self, count: i32) -> Self {
+    pub const fn with_sensor_count(mut self, count: i32) -> Self {
         self.sensor_count = Some(count);
         self
     }
 
     #[must_use]
-    pub fn with_interval_seconds(mut self, seconds: i32) -> Self {
+    pub const fn with_interval_seconds(mut self, seconds: i32) -> Self {
         self.interval_seconds = Some(seconds);
         self
     }
 
     #[must_use]
-    pub fn with_retention_years(mut self, years: i32) -> Self {
+    pub const fn with_retention_years(mut self, years: i32) -> Self {
         self.retention_years = Some(years);
         self
     }
@@ -226,7 +226,7 @@ mod tests {
             .with_start("2024-01-01T00:00:00Z".to_string())
             .with_limit(100);
 
-        let debug_str = format!("{:?}", query);
+        let debug_str = format!("{query:?}");
         assert!(debug_str.contains("2024-01-01T00:00:00Z"));
         assert!(debug_str.contains("100"));
     }
@@ -253,7 +253,7 @@ mod tests {
         assert_eq!(historical_query.limit, Some(0));
 
         // Test empty strings
-        let time_bucket_query = TimeBucketQuery::new().with_interval("".to_string());
-        assert_eq!(time_bucket_query.interval, Some("".to_string()));
+        let time_bucket_query = TimeBucketQuery::new().with_interval(String::new());
+        assert_eq!(time_bucket_query.interval, Some(String::new()));
     }
 }

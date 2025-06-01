@@ -22,7 +22,7 @@ impl Config {
     }
 
     /// Create a new Config with explicit values (mainly for testing)
-    pub fn new(database_url: String, api_port: u16) -> Self {
+    pub const fn new(database_url: String, api_port: u16) -> Self {
         Self {
             database_url,
             api_port,
@@ -57,7 +57,7 @@ mod tests {
         std::env::remove_var("DATABASE_URL");
         std::env::remove_var("API_PORT");
 
-        let config = Config::from_env().unwrap();
+        let config = Config::from_env().expect("Should create config from env");
         assert!(config
             .database_url
             .contains("postgresql://ruuvi:ruuvi_secret"));
@@ -71,7 +71,7 @@ mod tests {
             Some("postgresql://custom".to_string()),
             Some("9090".to_string()),
         )
-        .unwrap();
+        .expect("Should create config from custom env vars");
         assert_eq!(config.database_url, "postgresql://custom");
         assert_eq!(config.api_port, 9090);
     }
@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn test_config_edge_cases() {
         // Test empty string for port
-        let result = Config::from_env_vars(None, Some("".to_string()));
+        let result = Config::from_env_vars(None, Some(String::new()));
         assert!(result.is_err());
 
         // Test port too high (u16::MAX is 65535)
@@ -104,7 +104,7 @@ mod tests {
     #[test]
     fn test_config_debug_output() {
         let config = Config::new("test://db".to_string(), 1234);
-        let debug_str = format!("{:?}", config);
+        let debug_str = format!("{config:?}");
         assert!(debug_str.contains("test://db"));
         assert!(debug_str.contains("1234"));
     }

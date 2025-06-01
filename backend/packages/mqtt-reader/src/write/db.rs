@@ -5,6 +5,7 @@ use postgres_store::{
     PostgresStore,
 };
 
+#[derive(Debug)]
 pub struct PostgresWriter {
     store: Arc<PostgresStore>,
 }

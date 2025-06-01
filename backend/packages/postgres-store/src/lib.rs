@@ -1,3 +1,8 @@
+// Enforce strict error handling in application code, but allow expect/unwrap in
+// tests
+#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
+#![cfg_attr(not(test), deny(clippy::panic))]
+
 use anyhow::Result;
 use bigdecimal::ToPrimitive;
 use chrono::{
@@ -94,7 +99,7 @@ impl PostgresStore {
 
     pub async fn insert_event(&self, event: &Event) -> Result<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO sensor_data (
                 sensor_mac, gateway_mac, temperature, humidity, pressure,
                 battery, tx_power, movement_counter, measurement_sequence_number,
@@ -102,7 +107,7 @@ impl PostgresStore {
                 rssi, timestamp
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-            "#,
+            ",
         )
         .bind(&event.sensor_mac)
         .bind(&event.gateway_mac)
@@ -134,7 +139,7 @@ impl PostgresStore {
 
     pub async fn get_active_sensors(&self) -> Result<Vec<Event>> {
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT DISTINCT ON (sensor_mac, gateway_mac)
                 sensor_mac, gateway_mac, temperature, humidity, pressure,
                 battery, tx_power, movement_counter, measurement_sequence_number,
@@ -143,7 +148,7 @@ impl PostgresStore {
             FROM sensor_data
             WHERE timestamp > NOW() - INTERVAL '24 hours'
             ORDER BY sensor_mac, gateway_mac, timestamp DESC
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -174,7 +179,7 @@ impl PostgresStore {
 
     pub async fn get_latest_reading(&self, sensor_mac: &str) -> Result<Option<Event>> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT sensor_mac, gateway_mac, temperature, humidity, pressure,
                    battery, tx_power, movement_counter, measurement_sequence_number,
                    acceleration, acceleration_x, acceleration_y, acceleration_z,
@@ -183,7 +188,7 @@ impl PostgresStore {
             WHERE sensor_mac = $1
             ORDER BY timestamp DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(sensor_mac)
         .fetch_optional(&self.pool)
@@ -212,6 +217,7 @@ impl PostgresStore {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_historical_data(
         &self,
         sensor_mac: &str,
@@ -224,7 +230,7 @@ impl PostgresStore {
         let limit = limit.unwrap_or(100);
 
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT sensor_mac, gateway_mac, temperature, humidity, pressure,
                    battery, tx_power, movement_counter, measurement_sequence_number,
                    acceleration, acceleration_x, acceleration_y, acceleration_z,
@@ -235,7 +241,7 @@ impl PostgresStore {
               AND timestamp <= $3
             ORDER BY timestamp DESC
             LIMIT $4
-            "#,
+            ",
         )
         .bind(sensor_mac)
         .bind(start)
@@ -275,7 +281,7 @@ impl PostgresStore {
         end: DateTime<Utc>,
     ) -> Result<Vec<Event>> {
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT sensor_mac, gateway_mac, temperature, humidity, pressure,
                    battery, tx_power, movement_counter, measurement_sequence_number,
                    acceleration, acceleration_x, acceleration_y, acceleration_z,
@@ -285,7 +291,7 @@ impl PostgresStore {
               AND timestamp >= $2
               AND timestamp <= $3
             ORDER BY timestamp ASC
-            "#,
+            ",
         )
         .bind(sensor_mac)
         .bind(start)
@@ -323,7 +329,7 @@ impl PostgresStore {
 
     pub async fn get_sensor_statistics(&self, sensor_mac: &str, hours: i32) -> Result<SensorStats> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT
                 AVG(temperature) as avg_temp,
                 MIN(temperature) as min_temp,
@@ -338,7 +344,7 @@ impl PostgresStore {
             FROM sensor_data
             WHERE sensor_mac = $1
               AND timestamp > NOW() - INTERVAL '1 hour' * $2
-            "#,
+            ",
         )
         .bind(sensor_mac)
         .bind(hours)
@@ -369,6 +375,7 @@ impl PostgresStore {
         Ok(result.rows_affected())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn get_time_bucketed_data(
         &self,
         sensor_mac: &str,
@@ -380,7 +387,7 @@ impl PostgresStore {
 
         // For now, implement basic time bucketing without the custom function
         let query = format!(
-            r#"
+            r"
             SELECT
                 time_bucket(INTERVAL '{interval_str}', timestamp) AS bucket,
                 AVG(temperature) AS avg_temperature,
@@ -399,7 +406,7 @@ impl PostgresStore {
               AND timestamp <= $3
             GROUP BY bucket
             ORDER BY bucket
-            "#,
+            ",
         );
 
         let rows = sqlx::query(&query)
@@ -458,7 +465,7 @@ impl PostgresStore {
         hours_back: i32,
     ) -> Result<Vec<TimeBucketedData>> {
         let end_time = Utc::now();
-        let start_time = end_time - chrono::Duration::hours(hours_back as i64);
+        let start_time = end_time - chrono::Duration::hours(i64::from(hours_back));
 
         self.get_time_bucketed_data(sensor_mac, interval, start_time, end_time)
             .await
@@ -469,19 +476,20 @@ impl PostgresStore {
         sensor_mac: &str,
         hours_back: i32,
     ) -> Result<Vec<(DateTime<Utc>, f64)>> {
-        let start_time = Utc::now() - chrono::Duration::hours(hours_back as i64);
+        let start_time = Utc::now() - chrono::Duration::hours(i64::from(hours_back));
 
         let rows = sqlx::query(
-            r#"
+            r"
             SELECT
                 time_bucket(INTERVAL '15 minutes', timestamp) AS bucket,
                 AVG(temperature) AS avg_temp
             FROM sensor_data
             WHERE sensor_mac = $1
               AND timestamp >= $2
+              AND timestamp <= $3
             GROUP BY bucket
             ORDER BY bucket
-            "#,
+            ",
         )
         .bind(sensor_mac)
         .bind(start_time)
@@ -506,10 +514,10 @@ impl PostgresStore {
         sensor_mac: &str,
         hours_back: i32,
     ) -> Result<SensorHealthMetrics> {
-        let start_time = Utc::now() - chrono::Duration::hours(hours_back as i64);
+        let start_time = Utc::now() - chrono::Duration::hours(i64::from(hours_back));
 
         let row = sqlx::query(
-            r#"
+            r"
             SELECT
                 COUNT(*) as total_readings,
                 AVG(battery) as avg_battery,
@@ -520,7 +528,7 @@ impl PostgresStore {
             FROM sensor_data
             WHERE sensor_mac = $1
               AND timestamp >= $2
-            "#,
+            ",
         )
         .bind(sensor_mac)
         .bind(start_time)
@@ -543,7 +551,7 @@ impl PostgresStore {
     pub async fn get_storage_stats(&self) -> Result<StorageStats> {
         // Simplified storage stats without custom functions
         let row = sqlx::query(
-            r#"
+            r"
             SELECT
                 'sensor_data' as table_name,
                 pg_total_relation_size('sensor_data') / 1024.0 / 1024.0 as raw_size_mb,
@@ -553,7 +561,7 @@ impl PostgresStore {
                 MIN(timestamp) as oldest_data,
                 MAX(timestamp) as newest_data
             FROM sensor_data
-            "#,
+            ",
         )
         .fetch_one(&self.pool)
         .await?;
@@ -574,6 +582,7 @@ impl PostgresStore {
         })
     }
 
+    #[allow(clippy::unused_async)]
     pub async fn estimate_storage_requirements(
         &self,
         sensor_count: i32,
@@ -581,9 +590,9 @@ impl PostgresStore {
         retention_years: i32,
     ) -> Result<StorageEstimate> {
         // Simple calculation
-        let readings_per_sensor_per_year = (365 * 24 * 3600) / reading_interval_seconds as i64;
+        let readings_per_sensor_per_year = (365 * 24 * 3600) / i64::from(reading_interval_seconds);
         let total_readings =
-            readings_per_sensor_per_year * sensor_count as i64 * retention_years as i64;
+            readings_per_sensor_per_year * i64::from(sensor_count) * i64::from(retention_years);
         let bytes_per_reading = 200;
         let compression_ratio = 10.0;
 
@@ -600,20 +609,20 @@ impl PostgresStore {
             uncompressed_size_gb: Some(uncompressed_gb),
             compressed_size_gb: Some(compressed_gb),
             daily_aggregates_size_mb: Some(
-                (sensor_count * 365 * retention_years * 150) as f64 / 1024.0 / 1024.0,
+                f64::from(sensor_count * 365 * retention_years * 150) / 1024.0 / 1024.0,
             ),
             hourly_aggregates_size_mb: Some(
-                (sensor_count * 365 * 24 * retention_years * 150) as f64 / 1024.0 / 1024.0,
+                f64::from(sensor_count * 365 * 24 * retention_years * 150) / 1024.0 / 1024.0,
             ),
             total_estimated_size_gb: Some(compressed_gb + 0.1), // Add small overhead
         })
     }
 
     pub async fn get_growth_statistics(&self, days_back: i32) -> Result<GrowthStatistics> {
-        let start_time = Utc::now() - chrono::Duration::days(days_back as i64);
+        let start_time = Utc::now() - chrono::Duration::days(i64::from(days_back));
 
         let row = sqlx::query(
-            r#"
+            r"
             SELECT
                 $1 as period_days,
                 COUNT(*) as readings_added,
@@ -622,9 +631,9 @@ impl PostgresStore {
                 365.0 as estimated_yearly_growth_gb
             FROM sensor_data
             WHERE timestamp >= $2
-            "#,
+            ",
         )
-        .bind(days_back)
+        .bind(i64::from(days_back))
         .bind(start_time)
         .fetch_one(&self.pool)
         .await?;
@@ -730,10 +739,10 @@ pub enum TimeInterval {
 impl TimeInterval {
     pub fn to_interval_string(&self) -> String {
         match self {
-            TimeInterval::Minutes(m) => format!("{m} minutes"),
-            TimeInterval::Hours(h) => format!("{h} hours"),
-            TimeInterval::Days(d) => format!("{d} days"),
-            TimeInterval::Weeks(w) => format!("{w} weeks"),
+            TimeInterval::Minutes(minutes) => format!("{minutes} minutes"),
+            TimeInterval::Hours(hours) => format!("{hours} hours"),
+            TimeInterval::Days(days) => format!("{days} days"),
+            TimeInterval::Weeks(weeks) => format!("{weeks} weeks"),
         }
     }
 }
