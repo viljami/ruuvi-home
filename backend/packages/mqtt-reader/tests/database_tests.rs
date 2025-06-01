@@ -1,7 +1,7 @@
 //! Database writing tests for mqtt-reader
 //!
 //! These tests verify the database writing functionality of the mqtt-reader,
-//! including PostgreSQL integration, error handling, and data persistence.
+//! including `PostgreSQL` integration, error handling, and data persistence.
 
 use anyhow::Result;
 use chrono::Utc;
@@ -138,6 +138,7 @@ async fn test_event_creation_and_validation() {
 }
 
 #[tokio::test]
+#[allow(clippy::unwrap_used)]
 async fn test_multiple_events_creation() {
     let events = create_multiple_test_events();
     assert_eq!(events.len(), 3);
@@ -221,6 +222,7 @@ async fn test_write_config_validation() {
 
 #[tokio::test]
 #[ignore = "Requires Docker for PostgreSQL"]
+#[allow(clippy::expect_used)]
 async fn test_postgres_writer_integration() -> Result<()> {
     let container = postgres::Postgres::default()
         .start()
@@ -251,6 +253,7 @@ async fn test_postgres_writer_integration() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "Requires Docker for PostgreSQL"]
+#[allow(clippy::expect_used)]
 async fn test_postgres_writer_single_event() -> Result<()> {
     let container = postgres::Postgres::default()
         .start()
@@ -281,6 +284,7 @@ async fn test_postgres_writer_single_event() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "Requires Docker for PostgreSQL"]
+#[allow(clippy::expect_used)]
 async fn test_postgres_writer_empty_events() -> Result<()> {
     let container = postgres::Postgres::default()
         .start()
@@ -311,6 +315,7 @@ async fn test_postgres_writer_empty_events() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "Requires Docker for PostgreSQL"]
+#[allow(clippy::expect_used)]
 async fn test_postgres_writer_large_batch() -> Result<()> {
     let container = postgres::Postgres::default()
         .start()
@@ -345,6 +350,7 @@ async fn test_postgres_writer_large_batch() -> Result<()> {
 
 #[tokio::test]
 #[ignore = "Requires Docker for PostgreSQL"]
+#[allow(clippy::expect_used)]
 async fn test_postgres_writer_realistic_data() -> Result<()> {
     let container = postgres::Postgres::default()
         .start()

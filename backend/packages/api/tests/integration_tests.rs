@@ -135,6 +135,7 @@ async fn test_parameter_validation_logic() {
 }
 
 #[tokio::test]
+#[allow(clippy::unwrap_used)]
 async fn test_query_parameter_parsing() {
     // Test that our query structs deserialize correctly
     let historical_query: api::HistoricalQuery =
@@ -204,8 +205,9 @@ async fn test_limit_validation() {
 }
 
 #[tokio::test]
-async fn test_config_validation() {
-    // Test config creation and validation
+#[allow(clippy::unwrap_used)]
+async fn test_config_creation() {
+    // Test basic config creation
     let config = api::Config::new("postgresql://test".to_string(), 3000);
     assert_eq!(config.database_url, "postgresql://test");
     assert_eq!(config.api_port, 3000);
@@ -222,7 +224,7 @@ async fn test_config_validation() {
 }
 
 #[tokio::test]
-async fn test_config_creation() {
+async fn test_config_basic_creation() {
     // Test that we can create config without panicking
     let config = api::Config::new("postgresql://fake".to_string(), 8080);
     assert_eq!(config.api_port, 8080);

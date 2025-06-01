@@ -596,6 +596,7 @@ impl PostgresStore {
         let bytes_per_reading = 200;
         let compression_ratio = 10.0;
 
+        #[allow(clippy::cast_precision_loss)]
         let uncompressed_gb =
             (total_readings * bytes_per_reading) as f64 / 1024.0 / 1024.0 / 1024.0;
         let compressed_gb = uncompressed_gb / compression_ratio;

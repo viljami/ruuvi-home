@@ -78,31 +78,32 @@ pub trait Decoder {
 pub struct Df5Decoder;
 
 impl Df5Decoder {
-    fn get_temperature(&self, data: &ByteDataDf5) -> Option<f32> {
+    fn get_temperature(data: ByteDataDf5) -> Option<f32> {
         if data.1 == -32768 {
             None
         } else {
-            Some(data.1 as f32 / 200.0)
+            Some(f32::from(data.1) / 200.0)
         }
     }
 
-    fn get_humidity(&self, data: &ByteDataDf5) -> Option<f32> {
+    fn get_humidity(data: ByteDataDf5) -> Option<f32> {
         if data.2 == 0xFFFF {
             None
         } else {
-            Some(data.2 as f32 / 400.0)
+            Some(f32::from(data.2) / 400.0)
         }
     }
 
-    fn get_pressure(&self, data: &ByteDataDf5) -> Option<f32> {
+    fn get_pressure(data: ByteDataDf5) -> Option<f32> {
         if data.3 == 0xFFFF {
             None
         } else {
-            Some((data.3 as u32 + 50000) as f32 / 100.0)
+            #[allow(clippy::cast_precision_loss)]
+            Some((u32::from(data.3) + 50000) as f32 / 100.0)
         }
     }
 
-    fn get_acceleration(&self, data: &ByteDataDf5) -> Acceleration {
+    fn get_acceleration(data: ByteDataDf5) -> Acceleration {
         let acc_x = data.4;
         let acc_y = data.5;
         let acc_z = data.6;
@@ -113,14 +114,14 @@ impl Df5Decoder {
         }
     }
 
-    fn get_powerinfo(&self, data: &ByteDataDf5) -> (u16, i8) {
+    fn get_powerinfo(data: ByteDataDf5) -> (u16, i8) {
         let battery_voltage = data.7 >> 5;
         let tx_power = (data.7 & 0x001F) as i8;
         (battery_voltage, tx_power)
     }
 
-    fn get_battery(&self, data: &ByteDataDf5) -> Option<u16> {
-        let battery_voltage = self.get_powerinfo(data).0;
+    fn get_battery(data: ByteDataDf5) -> Option<u16> {
+        let battery_voltage = Self::get_powerinfo(data).0;
         if battery_voltage == 0b111_1111_1111 {
             None
         } else {
@@ -128,29 +129,29 @@ impl Df5Decoder {
         }
     }
 
-    fn get_txpower(&self, data: &ByteDataDf5) -> Option<i8> {
-        let tx_power = self.get_powerinfo(data).1;
+    fn get_txpower(data: ByteDataDf5) -> Option<i8> {
+        let tx_power = Self::get_powerinfo(data).1;
         if tx_power == 0b11111 {
             None
         } else {
-            Some(-40 + (tx_power as i16 * 2) as i8)
+            #[allow(clippy::cast_possible_truncation)]
+            Some(-40 + (i16::from(tx_power) * 2) as i8)
         }
     }
 
-    fn get_movementcounter(&self, data: &ByteDataDf5) -> u8 {
+    fn get_movementcounter(data: ByteDataDf5) -> u8 {
         data.8
     }
 
-    fn get_measurementsequencenumber(&self, data: &ByteDataDf5) -> u16 {
+    fn get_measurementsequencenumber(data: ByteDataDf5) -> u16 {
         data.9
     }
 
-    fn get_mac(&self, data: &ByteDataDf5) -> String {
-        [data.10, data.11, data.12, data.13, data.14, data.15]
-            .iter()
-            .map(|x| format!("{x:02x}"))
-            .collect::<Vec<String>>()
-            .join("")
+    fn get_mac(data: ByteDataDf5) -> String {
+        format!(
+            "{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+            data.10, data.11, data.12, data.13, data.14, data.15
+        )
     }
 
     // fn get_rssi(&self, rssi_byte: &str) -> i8 {
@@ -170,10 +171,11 @@ impl Decoder for Df5Decoder {
         let data_structure = structure!(">BhHHhhhHBH6B");
         let byte_data = data_structure.unpack(&byte_data)?;
         // let rssi = &data[48..];
-        let (acc_x, acc_y, acc_z) = self.get_acceleration(&byte_data);
+        let (acc_x, acc_y, acc_z) = Self::get_acceleration(byte_data);
         let acc = if let (Some(acc_x_val), Some(acc_y_val), Some(acc_z_val)) = (acc_x, acc_y, acc_z)
         {
             println!("x: {acc_x_val}, y: {acc_y_val}, z: {acc_z_val}");
+            #[allow(clippy::cast_precision_loss)]
             Some(
                 (((i64::from(acc_x_val)).pow(2)
                     + (i64::from(acc_y_val)).pow(2)
@@ -185,18 +187,18 @@ impl Decoder for Df5Decoder {
         };
         Ok(SensorData::Df5(SensorData5 {
             data_format: 5,
-            humidity: self.get_humidity(&byte_data),
-            temperature: self.get_temperature(&byte_data).unwrap_or(0.0),
-            pressure: self.get_pressure(&byte_data),
+            humidity: Self::get_humidity(byte_data),
+            temperature: Self::get_temperature(byte_data).unwrap_or(0.0),
+            pressure: Self::get_pressure(byte_data),
             acceleration: acc.unwrap_or(0.0),
             acceleration_x: acc_x.unwrap_or(0),
             acceleration_y: acc_y.unwrap_or(0),
             acceleration_z: acc_z.unwrap_or(0),
-            tx_power: self.get_txpower(&byte_data),
-            battery: self.get_battery(&byte_data),
-            movement_counter: self.get_movementcounter(&byte_data),
-            measurement_sequence_number: self.get_measurementsequencenumber(&byte_data),
-            mac: self.get_mac(&byte_data),
+            tx_power: Self::get_txpower(byte_data),
+            battery: Self::get_battery(byte_data),
+            movement_counter: Self::get_movementcounter(byte_data),
+            measurement_sequence_number: Self::get_measurementsequencenumber(byte_data),
+            mac: Self::get_mac(byte_data),
             rssi: None, /* rssi: if rssi.is_empty() {
                          *     None
                          * } else {
@@ -330,7 +332,7 @@ mod test {
 
         assert_eq!(sensor_data.data_format, 5);
         assert_eq!(sensor_data.humidity, Some(65.0_f32));
-        assert_eq!(sensor_data.temperature, 22.5_f32);
+        assert!((sensor_data.temperature - 22.5_f32).abs() < f32::EPSILON);
         assert_eq!(sensor_data.mac, "AA:BB:CC:DD:EE:FF");
     }
 
@@ -379,7 +381,7 @@ mod test {
             rssi: Some(i8::MIN),
         };
 
-        assert_eq!(sensor_data.temperature, -273.15_f32);
+        assert!((sensor_data.temperature - (-273.15_f32)).abs() < f32::EPSILON);
         assert_eq!(sensor_data.acceleration_x, i16::MIN);
         assert_eq!(sensor_data.acceleration_y, i16::MAX);
         assert_eq!(sensor_data.movement_counter, u8::MAX);
@@ -410,7 +412,7 @@ mod test {
         match sensor_data {
             SensorData::Df5(data) => {
                 assert_eq!(data.data_format, 5);
-                assert_eq!(data.temperature, 25.0);
+                assert!((data.temperature - 25.0).abs() < f32::EPSILON);
             }
         }
     }

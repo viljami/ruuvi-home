@@ -100,6 +100,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn test_parse_datetime_valid() {
         let datetime_str = "2024-01-01T00:00:00Z";
         let result = parse_datetime(datetime_str);
@@ -112,6 +113,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unwrap_used)]
     fn test_parse_datetime_with_milliseconds() {
         let datetime_str = "2024-01-01T12:30:45.123Z";
         let result = parse_datetime(datetime_str);

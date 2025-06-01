@@ -52,6 +52,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::expect_used)]
     fn test_config_from_env_defaults() {
         // Clear environment variables to test defaults
         std::env::remove_var("DATABASE_URL");
@@ -65,6 +66,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::expect_used)]
     fn test_config_from_env_custom() {
         // Test custom values using the internal function (no global env interference)
         let config = Config::from_env_vars(

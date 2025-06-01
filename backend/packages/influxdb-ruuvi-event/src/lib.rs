@@ -210,11 +210,12 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::expect_used)]
     fn test_event_new_with_current_timestamp() {
         #[allow(clippy::cast_possible_wrap)]
         let before = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("System time should be after UNIX epoch")
             .as_secs() as i64;
 
         let event = Event::new_with_current_timestamp(
@@ -237,7 +238,7 @@ mod tests {
         #[allow(clippy::cast_possible_wrap)]
         let after = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
+            .expect("System time should be after UNIX epoch")
             .as_secs() as i64;
 
         assert!(event.timestamp >= before);
@@ -247,17 +248,19 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::expect_used)]
     fn test_event_serialization() {
         let event = create_test_event();
 
         // Test JSON serialization
-        let json = serde_json::to_string(&event).unwrap();
+        let json = serde_json::to_string(&event).expect("Event should serialize to JSON");
         assert!(json.contains("AA:BB:CC:DD:EE:01"));
         assert!(json.contains("22.5"));
         assert!(json.contains("1640995200"));
 
         // Test JSON deserialization
-        let deserialized: Event = serde_json::from_str(&json).unwrap();
+        let deserialized: Event =
+            serde_json::from_str(&json).expect("JSON should deserialize to Event");
         assert_eq!(deserialized.sensor_mac, event.sensor_mac);
         assert_float_eq(deserialized.temperature, event.temperature);
         assert_eq!(deserialized.timestamp, event.timestamp);
@@ -351,14 +354,16 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::expect_used)]
     fn test_event_json_roundtrip() {
         let original = create_test_event();
 
         // Serialize to JSON
-        let json = serde_json::to_string(&original).unwrap();
+        let json = serde_json::to_string(&original).expect("Event should serialize to JSON");
 
         // Deserialize from JSON
-        let restored: Event = serde_json::from_str(&json).unwrap();
+        let restored: Event =
+            serde_json::from_str(&json).expect("JSON should deserialize to Event");
 
         // Verify all fields match
         assert_eq!(original.sensor_mac, restored.sensor_mac);

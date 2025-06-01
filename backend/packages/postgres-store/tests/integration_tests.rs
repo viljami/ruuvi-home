@@ -80,8 +80,8 @@ async fn test_insert_and_retrieve_event() {
 
     let event = event.unwrap();
     assert_eq!(event.sensor_mac, test_event.sensor_mac);
-    assert_eq!(event.temperature, test_event.temperature);
-    assert_eq!(event.humidity, test_event.humidity);
+    assert!((event.temperature - test_event.temperature).abs() < f64::EPSILON);
+    assert!((event.humidity - test_event.humidity).abs() < f64::EPSILON);
 
     test_db
         .cleanup()
@@ -199,6 +199,7 @@ async fn test_historical_data() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_time_bucketing() {
     let test_db = TestDatabase::new()
         .await
@@ -209,30 +210,30 @@ async fn test_time_bucketing() {
     // Insert events across multiple hours with varying temperatures
     let events = vec![
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(2));
-            e.temperature = 20.0;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(2));
+            event.temperature = 20.0;
+            event
         },
         {
-            let mut e = create_test_event(
+            let mut event = create_test_event(
                 "AA:BB:CC:DD:EE:01",
                 now - Duration::hours(2) + Duration::minutes(30),
             );
-            e.temperature = 22.0;
-            e
+            event.temperature = 22.0;
+            event
         },
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(1));
-            e.temperature = 25.0;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(1));
+            event.temperature = 25.0;
+            event
         },
         {
-            let mut e = create_test_event(
+            let mut event = create_test_event(
                 "AA:BB:CC:DD:EE:01",
                 now - Duration::hours(1) + Duration::minutes(30),
             );
-            e.temperature = 27.0;
-            e
+            event.temperature = 27.0;
+            event
         },
     ];
 
@@ -300,22 +301,22 @@ async fn test_sensor_statistics() {
     // Insert events with varying values
     let events = vec![
         {
-            let mut e = create_test_event(mac, now - Duration::hours(1));
-            e.temperature = 20.0;
-            e.battery = 3000;
-            e
+            let mut event = create_test_event(mac, now - Duration::hours(1));
+            event.temperature = 20.0;
+            event.battery = 3000;
+            event
         },
         {
-            let mut e = create_test_event(mac, now - Duration::minutes(30));
-            e.temperature = 25.0;
-            e.battery = 2950;
-            e
+            let mut event = create_test_event(mac, now - Duration::minutes(30));
+            event.temperature = 25.0;
+            event.battery = 2950;
+            event
         },
         {
-            let mut e = create_test_event(mac, now);
-            e.temperature = 22.0;
-            e.battery = 2900;
-            e
+            let mut event = create_test_event(mac, now);
+            event.temperature = 22.0;
+            event.battery = 2900;
+            event
         },
     ];
 
@@ -338,8 +339,8 @@ async fn test_sensor_statistics() {
     let stats = stats.unwrap();
     assert_eq!(stats.reading_count, 3);
     assert!(stats.avg_temperature > 20.0 && stats.avg_temperature < 25.0);
-    assert_eq!(stats.min_temperature, 20.0);
-    assert_eq!(stats.max_temperature, 25.0);
+    assert!((stats.min_temperature - 20.0).abs() < f64::EPSILON);
+    assert!((stats.max_temperature - 25.0).abs() < f64::EPSILON);
 
     test_db
         .cleanup()
@@ -446,19 +447,19 @@ async fn test_temperature_trend() {
     // Insert events across time
     let events = vec![
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(1));
-            e.temperature = 20.0;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(1));
+            event.temperature = 20.0;
+            event
         },
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::minutes(30));
-            e.temperature = 22.0;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::minutes(30));
+            event.temperature = 22.0;
+            event
         },
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now);
-            e.temperature = 24.0;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now);
+            event.temperature = 24.0;
+            event
         },
     ];
 
@@ -496,6 +497,7 @@ async fn test_temperature_trend() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_sensor_health_metrics() {
     let test_db = TestDatabase::new()
         .await
@@ -506,22 +508,22 @@ async fn test_sensor_health_metrics() {
     // Insert events with health data
     let events = vec![
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(1));
-            e.battery = 3000;
-            e.rssi = -40;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::hours(1));
+            event.battery = 3000;
+            event.rssi = -40;
+            event
         },
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::minutes(30));
-            e.battery = 2950;
-            e.rssi = -45;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now - Duration::minutes(30));
+            event.battery = 2950;
+            event.rssi = -45;
+            event
         },
         {
-            let mut e = create_test_event("AA:BB:CC:DD:EE:01", now);
-            e.battery = 2900;
-            e.rssi = -50;
-            e
+            let mut event = create_test_event("AA:BB:CC:DD:EE:01", now);
+            event.battery = 2900;
+            event.rssi = -50;
+            event
         },
     ];
 
