@@ -207,7 +207,7 @@ compose_cmd() {
     local cmd="$COMPOSE_COMMAND"
 
     # Add compose file if specified
-    if [ -n "$compose_file" ] && [ "$compose_file" != "docker-compose.yaml" ]; then
+    if [ -n "$compose_file" ]; then
         cmd="$cmd -f $compose_file"
     fi
 

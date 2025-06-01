@@ -17,6 +17,15 @@ readonly DOCKER_GPG_URL="https://download.docker.com/linux/ubuntu/gpg"
 readonly DOCKER_REPO_URL="https://download.docker.com/linux/ubuntu"
 readonly INSTALL_SCRIPT_URL="https://get.docker.com"
 
+# Get script directory for imports
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib"
+
+# Source docker compatibility library
+if [ -f "$LIB_DIR/docker-compat.sh" ]; then
+    source "$LIB_DIR/docker-compat.sh"
+fi
+
 log_info() {
     echo -e "${COLOR_BLUE}[INFO]${COLOR_NC} $1"
 }
@@ -362,6 +371,11 @@ test_compose_syntax() {
 
     local project_dir="${PROJECT_DIR:-/home/${SUDO_USER:-pi}/ruuvi-home}"
 
+    # Initialize docker compatibility if available
+    if command -v init_docker_compat >/dev/null 2>&1; then
+        init_docker_compat >/dev/null 2>&1 || true
+    fi
+
     if [ -d "$project_dir" ]; then
         cd "$project_dir"
 
@@ -369,7 +383,14 @@ test_compose_syntax() {
 
         for compose_file in "${test_files[@]}"; do
             if [ -f "$compose_file" ]; then
-                if docker compose -f "$compose_file" config >/dev/null 2>&1; then
+                # Use compatibility layer if available, fallback to direct command
+                if [ -n "${COMPOSE_COMMAND:-}" ]; then
+                    if $COMPOSE_COMMAND -f "$compose_file" config >/dev/null 2>&1; then
+                        log_success "Compose syntax valid: $compose_file"
+                    else
+                        log_warn "Compose syntax issues in: $compose_file"
+                    fi
+                elif docker compose -f "$compose_file" config >/dev/null 2>&1; then
                     log_success "Compose syntax valid: $compose_file"
                 else
                     log_warn "Compose syntax issues in: $compose_file"

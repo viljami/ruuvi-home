@@ -309,17 +309,18 @@ fi
 # Deploy based on deployment mode
 DEPLOYMENT_MODE=\${DEPLOYMENT_MODE:-local}
 COMPOSE_FILE=\${DOCKER_COMPOSE_FILE:-docker-compose.yaml}
+COMPOSE_COMMAND="${COMPOSE_COMMAND}"
 
 if [ "\$DEPLOYMENT_MODE" = "registry" ]; then
     log_deployment "Registry mode: Pulling pre-built images..."
-    docker compose -f "\$COMPOSE_FILE" pull
+    \$COMPOSE_COMMAND -f "\$COMPOSE_FILE" pull
     log_deployment "Starting services with registry images..."
-    docker compose -f "\$COMPOSE_FILE" up -d --force-recreate
+    \$COMPOSE_COMMAND -f "\$COMPOSE_FILE" up -d --force-recreate
 else
     log_deployment "Local mode: Building Docker images..."
-    docker compose -f "\$COMPOSE_FILE" build --no-cache
+    \$COMPOSE_COMMAND -f "\$COMPOSE_FILE" build --no-cache
     log_deployment "Starting services with locally built images..."
-    docker compose -f "\$COMPOSE_FILE" up -d --force-recreate
+    \$COMPOSE_COMMAND -f "\$COMPOSE_FILE" up -d --force-recreate
 fi
 
 # Wait for services to be ready
@@ -327,7 +328,7 @@ log_deployment "Waiting for services to be ready..."
 sleep 30
 
 # Verify services are running
-if docker compose -f "\$COMPOSE_FILE" ps | grep -q "Up"; then
+if \$COMPOSE_COMMAND -f "\$COMPOSE_FILE" ps | grep -q "Up"; then
     log_deployment "Services started successfully"
 else
     log_deployment "Warning: Some services may not have started properly"

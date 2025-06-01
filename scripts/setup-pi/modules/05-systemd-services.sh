@@ -123,7 +123,8 @@ start_services() {
 
             # Try to pull images with detailed error handling
             local pull_output
-            if pull_output=$(sudo -u "$RUUVI_USER" docker compose -f "$compose_file" pull 2>&1); then
+            local pull_cmd=$(compose_cmd "pull" "$compose_file")
+            if pull_output=$(sudo -u "$RUUVI_USER" $pull_cmd 2>&1); then
                 log_success "$context" "Successfully pulled all required images"
             else
                 log_error "$context" "Failed to pull images from registry"
@@ -131,7 +132,8 @@ start_services() {
 
                 # Check if any images are available locally
                 local available_images
-                if available_images=$(sudo -u "$RUUVI_USER" docker compose -f "$compose_file" images -q 2>/dev/null); then
+                local images_cmd=$(compose_cmd "images -q" "$compose_file")
+                if available_images=$(sudo -u "$RUUVI_USER" $images_cmd 2>/dev/null); then
                     if [ -n "$available_images" ]; then
                         log_warn "$context" "Some images available locally, attempting to start with existing images"
                     else
