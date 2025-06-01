@@ -456,10 +456,20 @@ GITHUB_REGISTRY=${GITHUB_REGISTRY:-ghcr.io}
 GITHUB_REPO=${GITHUB_REPO:-}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
-# Public URLs (using shared configuration)
+# Public URLs (using detected external IP for webhooks)
 PUBLIC_API_URL=${PUBLIC_API_URL}
 PUBLIC_FRONTEND_URL=${PUBLIC_FRONTEND_URL}
 CORS_ALLOW_ORIGIN=${CORS_ALLOW_ORIGIN}
+
+# Webhook URLs (using detected public IP for external access)
+WEBHOOK_URL=https://${DETECTED_PUBLIC_IP}:${WEBHOOK_PORT}
+WEBHOOK_HTTP_URL=http://${DETECTED_PUBLIC_IP}:${WEBHOOK_PORT}
+
+# Network Information (for diagnostics)
+DETECTED_LOCAL_IP=${DETECTED_LOCAL_IP}
+DETECTED_EXTERNAL_IP=${DETECTED_EXTERNAL_IP}
+DETECTED_PUBLIC_IP=${DETECTED_PUBLIC_IP}
+NETWORK_SCENARIO=${NETWORK_SCENARIO}
 
 # Backup Configuration (using shared defaults)
 BACKUP_RETENTION_DAYS=30

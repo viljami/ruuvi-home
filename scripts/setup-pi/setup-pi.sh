@@ -40,20 +40,40 @@ generate_secure_passwords() {
     log_info "$context" "Passwords will be saved to .env file during setup"
 }
 
-# Initialize configuration using shared library
+# Initialize configuration using shared library with enhanced IP detection
 initialize_shared_configuration() {
     local context="$MAIN_CONTEXT"
 
-    log_info "$context" "Initializing configuration with shared library"
+    log_info "$context" "Initializing configuration with enhanced network detection"
 
-    # Use shared configuration library for network detection and URL construction
+    # Use enhanced network detection for robust external IP discovery
+    log_info "$context" "Detecting network configuration and external IP..."
+    detect_network_configuration
+
+    # Use shared configuration library for URL construction
     initialize_configuration
 
-    log_success "$context" "Configuration initialized"
+    log_success "$context" "Configuration initialized with network detection"
     log_info "$context" "Network scenario: $NETWORK_SCENARIO"
+    log_info "$context" "Local IP: $DETECTED_LOCAL_IP"
+    log_info "$context" "External IP: $DETECTED_EXTERNAL_IP"
+    log_info "$context" "Webhook IP: $DETECTED_PUBLIC_IP"
     log_info "$context" "Public API URL: $PUBLIC_API_URL"
     log_info "$context" "Public Frontend URL: $PUBLIC_FRONTEND_URL"
-    log_info "$context" "CORS Origins: $CORS_ALLOW_ORIGIN"
+
+    # Show network guidance
+    case "$NETWORK_SCENARIO" in
+        "nat")
+            log_warn "$context" "NAT detected - port forwarding will be required for webhooks"
+            log_info "$context" "External webhook URL: https://$DETECTED_EXTERNAL_IP:9000"
+            ;;
+        "direct")
+            log_success "$context" "Direct connection - webhooks should work immediately"
+            ;;
+        *)
+            log_warn "$context" "Network scenario unclear - manual configuration may be needed"
+            ;;
+    esac
 }
 
 # Configure HTTPS settings

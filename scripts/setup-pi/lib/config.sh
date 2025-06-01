@@ -201,25 +201,161 @@ construct_mqtt_authenticated_url() {
     echo "mqtt://${user}:${password}@${host}:${port}"
 }
 
-# Network Configuration
+# External IP Detection Services (in priority order)
+readonly EXTERNAL_IP_SERVICES=(
+    "ifconfig.me"
+    "ipinfo.io/ip"
+    "api.ipify.org"
+    "checkip.amazonaws.com"
+    "ipecho.net/plain"
+    "icanhazip.com"
+    "ident.me"
+    "whatismyipaddress.com/api/ip"
+)
+
+# Validate IP address format
+is_valid_ip() {
+    local ip="$1"
+    if [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+        # Check each octet is <= 255
+        local IFS='.'
+        local -a octets=($ip)
+        for octet in "${octets[@]}"; do
+            if [ "$octet" -gt 255 ]; then
+                return 1
+            fi
+        done
+        return 0
+    fi
+    return 1
+}
+
+# Detect external/public IP with multiple fallback services
+detect_external_ip() {
+    local context="CONFIG"
+    local external_ip=""
+    local timeout="${1:-5}"
+    local max_retries="${2:-2}"
+
+    log_info "$context" "Detecting external IP address..."
+
+    # Try each service with retries
+    for service in "${EXTERNAL_IP_SERVICES[@]}"; do
+        log_info "$context" "Trying service: $service"
+
+        local retry=0
+        while [ $retry -lt $max_retries ]; do
+            # Try to get IP from service
+            local detected_ip=""
+            if command -v curl >/dev/null 2>&1; then
+                detected_ip=$(curl -s --connect-timeout "$timeout" --max-time "$((timeout * 2))" "$service" 2>/dev/null | tr -d '[:space:]')
+            elif command -v wget >/dev/null 2>&1; then
+                detected_ip=$(wget -qO- --timeout="$timeout" "$service" 2>/dev/null | tr -d '[:space:]')
+            else
+                log_warn "$context" "Neither curl nor wget available for IP detection"
+                break 2
+            fi
+
+            # Validate the response
+            if [ -n "$detected_ip" ] && is_valid_ip "$detected_ip"; then
+                external_ip="$detected_ip"
+                log_success "$context" "External IP detected: $external_ip (via $service)"
+                echo "$external_ip"
+                return 0
+            fi
+
+            ((retry++))
+            if [ $retry -lt $max_retries ]; then
+                log_warn "$context" "Invalid response from $service (attempt $retry/$max_retries), retrying..."
+                sleep 1
+            fi
+        done
+
+        log_warn "$context" "Service $service failed after $max_retries attempts"
+    done
+
+    log_error "$context" "Failed to detect external IP from all services"
+    return 1
+}
+
+# Detect local IP with cross-platform compatibility
+detect_local_ip() {
+    local local_ip=""
+
+    # Method 1: hostname -I (Linux)
+    if [ -z "$local_ip" ]; then
+        local_ip=$(hostname -I 2>/dev/null | awk '{print $1}' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || echo "")
+    fi
+
+    # Method 2: ifconfig (macOS/Linux)
+    if [ -z "$local_ip" ] && command -v ifconfig >/dev/null 2>&1; then
+        local_ip=$(ifconfig 2>/dev/null | grep -E 'inet [0-9]' | grep -v '127.0.0.1' | awk '{print $2}' | head -1 | sed 's/addr://' || echo "")
+    fi
+
+    # Method 3: ip route (Linux)
+    if [ -z "$local_ip" ] && command -v ip >/dev/null 2>&1; then
+        local_ip=$(ip route get 8.8.8.8 2>/dev/null | grep -oE 'src [0-9.]+' | awk '{print $2}' || echo "")
+    fi
+
+    # Method 4: netstat (fallback)
+    if [ -z "$local_ip" ] && command -v netstat >/dev/null 2>&1; then
+        local_ip=$(netstat -rn 2>/dev/null | grep '^default' | awk '{print $NF}' | head -1 || echo "")
+        if [ -n "$local_ip" ] && command -v ifconfig >/dev/null 2>&1; then
+            local_ip=$(ifconfig "$local_ip" 2>/dev/null | grep -E 'inet [0-9]' | awk '{print $2}' | sed 's/addr://' || echo "")
+        fi
+    fi
+
+    # Validate the detected IP
+    if [ -n "$local_ip" ] && is_valid_ip "$local_ip"; then
+        echo "$local_ip"
+    else
+        echo "127.0.0.1"
+    fi
+}
+
+# Enhanced Network Configuration Detection
 detect_network_configuration() {
-    local local_ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
-    local external_ip=$(curl -s --connect-timeout 3 ifconfig.me 2>/dev/null || echo "$local_ip")
+    local context="CONFIG"
+    local local_ip=$(detect_local_ip)
     local hostname=$(hostname 2>/dev/null || echo "raspberrypi")
+
+    log_info "$context" "Detecting network configuration"
+
+    # Detect external IP with robust fallback
+    local external_ip=""
+    if external_ip=$(detect_external_ip 3 2); then
+        log_success "$context" "External IP detection successful"
+    else
+        log_warn "$context" "External IP detection failed, using local IP as fallback"
+        external_ip="$local_ip"
+    fi
 
     # Export for use by other modules
     export DETECTED_LOCAL_IP="$local_ip"
     export DETECTED_EXTERNAL_IP="$external_ip"
     export DETECTED_HOSTNAME="$hostname"
 
-    # Determine best public IP
-    if [ "$external_ip" != "$local_ip" ] && [ "$external_ip" != "unknown" ]; then
+    # Determine network scenario and best public IP
+    if [ "$external_ip" != "$local_ip" ] && [ "$external_ip" != "localhost" ] && is_valid_ip "$external_ip"; then
         export DETECTED_PUBLIC_IP="$external_ip"
         export NETWORK_SCENARIO="nat"
+        log_info "$context" "Network scenario: NAT (behind router/firewall)"
+        log_info "$context" "Local IP: $local_ip, Public IP: $external_ip"
+        log_warn "$context" "Port forwarding will be required for external access"
     else
         export DETECTED_PUBLIC_IP="$local_ip"
         export NETWORK_SCENARIO="direct"
+        log_info "$context" "Network scenario: Direct connection or local-only"
+        log_info "$context" "Using local IP: $local_ip"
     fi
+
+    # Additional network diagnostics
+    log_info "$context" "Network summary:"
+    log_info "$context" "  Hostname: $hostname"
+    log_info "$context" "  Local IP: $local_ip"
+    log_info "$context" "  External IP: $external_ip"
+    log_info "$context" "  Public IP (for webhooks): $DETECTED_PUBLIC_IP"
+    log_info "$context" "  Scenario: $NETWORK_SCENARIO"
 }
 
 # URL Construction

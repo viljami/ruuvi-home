@@ -30,24 +30,41 @@ print_header() {
 }
 
 get_pi_info() {
-    # Use shared configuration library for network detection
+    echo -e "${COLOR_CYAN}=== Raspberry Pi Information ===${COLOR_NC}"
+    echo ""
+
+    # Use enhanced network detection from shared configuration library
+    echo "Detecting network configuration..."
     detect_network_configuration
 
-    echo -e "${COLOR_CYAN}=== Raspberry Pi Information ===${COLOR_NC}"
-    echo "Hostname: $DETECTED_HOSTNAME"
-    echo "Local/Private IP: $DETECTED_LOCAL_IP"
-    echo "Public IP: $DETECTED_EXTERNAL_IP"
+    echo ""
+    echo "Network Details:"
+    echo "  Hostname: $DETECTED_HOSTNAME"
+    echo "  Local/Private IP: $DETECTED_LOCAL_IP"
+    echo "  External/Public IP: $DETECTED_EXTERNAL_IP"
+    echo "  Webhook IP (recommended): $DETECTED_PUBLIC_IP"
 
-    # Display network scenario using shared detection
+    # Display network scenario with enhanced information
+    echo ""
     case "$NETWORK_SCENARIO" in
         "nat")
-            echo -e "${COLOR_YELLOW}Network Scenario: NAT/Router (Port forwarding needed)${COLOR_NC}"
+            echo -e "${COLOR_YELLOW}🏠 Network Scenario: NAT/Router (Port forwarding needed)${COLOR_NC}"
+            echo "   Your Pi is behind a router/firewall"
+            echo "   Local IP ($DETECTED_LOCAL_IP) is different from public IP ($DETECTED_EXTERNAL_IP)"
+            echo "   GitHub webhooks must reach your public IP: $DETECTED_EXTERNAL_IP"
+            echo -e "${COLOR_YELLOW}   ⚠️  Port forwarding required for webhook to work${COLOR_NC}"
             ;;
         "direct")
-            echo -e "${COLOR_GREEN}Network Scenario: Direct Internet Connection${COLOR_NC}"
+            echo -e "${COLOR_GREEN}🌐 Network Scenario: Direct Internet Connection${COLOR_NC}"
+            echo "   Your Pi appears to have a direct public IP"
+            echo "   GitHub webhooks can reach directly: $DETECTED_PUBLIC_IP"
+            echo -e "${COLOR_GREEN}   ✅ No port forwarding needed${COLOR_NC}"
             ;;
         *)
-            echo -e "${COLOR_RED}Network Scenario: Unknown (Cannot determine public IP)${COLOR_NC}"
+            echo -e "${COLOR_RED}❓ Network Scenario: Unknown or Local-only${COLOR_NC}"
+            echo "   Could not determine external connectivity"
+            echo "   Using local IP for webhook: $DETECTED_PUBLIC_IP"
+            echo -e "${COLOR_RED}   ⚠️  May require manual network configuration${COLOR_NC}"
             ;;
     esac
     echo ""
@@ -94,41 +111,59 @@ show_webhook_url() {
     fi
     echo ""
 
+    # Show the recommended webhook URL prominently
+    echo -e "${COLOR_GREEN}🎯 RECOMMENDED WEBHOOK URL:${COLOR_NC}"
+    echo -e "${COLOR_GREEN}   $protocol://$DETECTED_PUBLIC_IP:$WEBHOOK_PORT${COLOR_NC}"
+    echo ""
+
     case "$NETWORK_SCENARIO" in
         "nat")
-            echo -e "${COLOR_YELLOW}⚠️  NAT/Router Detected - Port Forwarding Required${COLOR_NC}"
+            echo -e "${COLOR_YELLOW}📋 NAT/Router Setup Required${COLOR_NC}"
             echo ""
-            echo "🏠 Option 1: Local Development (GitHub on same network)"
-            echo "   URL: $protocol://$PI_LOCAL_IP:$WEBHOOK_PORT"
-            echo "   ⚠️  Only works if GitHub runner is on your local network"
+            echo "Your Pi is behind a router. To use the webhook URL above:"
             echo ""
-            echo "🌐 Option 2: Public Access (Recommended for GitHub.com)"
-            echo "   URL: $protocol://$PI_PUBLIC_IP:$WEBHOOK_PORT"
-            echo "   📋 REQUIRES: Router port forwarding configuration"
-            echo "      External Port: $WEBHOOK_PORT → Internal IP: $PI_LOCAL_IP → Internal Port: $WEBHOOK_PORT"
+            echo "🔧 Required: Configure Router Port Forwarding"
+            echo "   1. Access your router admin panel (usually 192.168.1.1 or 192.168.0.1)"
+            echo "   2. Find 'Port Forwarding' or 'Virtual Servers' section"
+            echo "   3. Add this rule:"
+            echo "      • Service Name: Ruuvi Webhook"
+            echo "      • External Port: $WEBHOOK_PORT"
+            echo "      • Internal IP: $PI_LOCAL_IP"
+            echo "      • Internal Port: $WEBHOOK_PORT"
+            echo "      • Protocol: TCP"
+            echo "   4. Save and restart router"
             echo ""
-            echo "🚇 Option 3: Tunnel Service (Easiest - No Router Config)"
-            echo "   • Install: sudo snap install ngrok"
-            echo "   • Run: ngrok http $WEBHOOK_PORT"
-            echo "   • Use provided https://xxxxx.ngrok.io URL"
+            echo "🧪 Test after setup:"
+            echo "   curl -k $protocol://$DETECTED_PUBLIC_IP:$WEBHOOK_PORT"
+            echo ""
+            echo -e "${COLOR_BLUE}🚇 Alternative: Skip Port Forwarding with Tunnel${COLOR_NC}"
+            echo "   • ngrok: sudo snap install ngrok && ngrok http $WEBHOOK_PORT"
+            echo "   • Use the provided https://xxxxx.ngrok.io URL instead"
             ;;
         "direct")
-            echo -e "${COLOR_GREEN}✅ Direct Internet Connection Detected${COLOR_NC}"
+            echo -e "${COLOR_GREEN}✅ Direct Connection - Ready to Use${COLOR_NC}"
             echo ""
-            echo "🌐 GitHub Webhook URL:"
-            echo "   $protocol://$PI_LOCAL_IP:$WEBHOOK_PORT"
-            echo "   ✅ No port forwarding needed"
+            echo "Your Pi has a direct internet connection."
+            echo "The webhook URL above should work immediately."
+            echo ""
+            echo "🧪 Test connection:"
+            echo "   curl -k $protocol://$DETECTED_PUBLIC_IP:$WEBHOOK_PORT"
+            echo "   Expected response: 'Ruuvi Home Webhook Server - OK'"
             ;;
         *)
-            echo -e "${COLOR_RED}❓ Cannot determine network setup${COLOR_NC}"
+            echo -e "${COLOR_RED}⚠️  Network Setup Unclear${COLOR_NC}"
             echo ""
-            echo "🏠 Local Network URL:"
-            echo "   $protocol://$PI_LOCAL_IP:$WEBHOOK_PORT"
+            echo "Could not determine your network configuration."
+            echo "This may be because:"
+            echo "• Internet connectivity is limited"
+            echo "• Firewall is blocking external IP detection"
+            echo "• Running in a local-only environment"
             echo ""
-            echo "Try these troubleshooting steps:"
-            echo "1. Check internet connectivity"
-            echo "2. Configure port forwarding"
-            echo "3. Consider using ngrok tunnel"
+            echo "🔍 Try these options:"
+            echo "1. Use local IP for testing: $protocol://$PI_LOCAL_IP:$WEBHOOK_PORT"
+            echo "2. Configure port forwarding if behind router"
+            echo "3. Use ngrok tunnel for external access"
+            echo "4. Check internet connectivity: curl ifconfig.me"
             ;;
     esac
     echo ""
@@ -232,54 +267,83 @@ show_certificate_info() {
 }
 
 show_network_requirements() {
-    echo -e "${COLOR_CYAN}=== Network Requirements ===${COLOR_NC}"
+    echo -e "${COLOR_CYAN}=== Network Requirements & Diagnostics ===${COLOR_NC}"
+    echo ""
+
+    # Show current network status
+    echo "📊 Current Network Status:"
+    echo "   Local IP: $DETECTED_LOCAL_IP"
+    echo "   Public IP: $DETECTED_EXTERNAL_IP"
+    echo "   Webhook will use: $DETECTED_PUBLIC_IP:$WEBHOOK_PORT"
     echo ""
 
     case "$NETWORK_SCENARIO" in
         "nat")
-            echo -e "${COLOR_YELLOW}🏠 NAT/Router Setup (Most Common)${COLOR_NC}"
+            echo -e "${COLOR_YELLOW}🏠 NAT/Router Configuration Required${COLOR_NC}"
             echo ""
-            echo "📋 Router Port Forwarding Configuration:"
-            echo "   1. Access router admin (usually 192.168.1.1 or 192.168.0.1)"
-            echo "   2. Find 'Port Forwarding' or 'Virtual Servers' section"
-            echo "   3. Add new rule:"
-            echo "      • Service Name: Ruuvi Webhook"
-            echo "      • External Port: $WEBHOOK_PORT"
-            echo "      • Internal IP: $PI_LOCAL_IP"
-            echo "      • Internal Port: $WEBHOOK_PORT"
-            echo "      • Protocol: TCP"
-            echo "   4. Save and restart router"
+            echo "Your setup requires port forwarding because:"
+            echo "• Local IP ($DETECTED_LOCAL_IP) ≠ Public IP ($DETECTED_EXTERNAL_IP)"
+            echo "• GitHub needs to reach $DETECTED_EXTERNAL_IP:$WEBHOOK_PORT"
+            echo "• Router must forward external traffic to internal Pi"
             echo ""
-            echo "🧪 Test Port Forwarding:"
-            echo "   From outside network: curl -k https://$PI_PUBLIC_IP:$WEBHOOK_PORT"
-            echo "   Should return 'Webhook Server - OK'"
+            echo "📋 Port Forwarding Steps:"
+            echo "   1. Router admin: http://192.168.1.1 (or your gateway IP)"
+            echo "   2. Port Forwarding/Virtual Servers section"
+            echo "   3. Add rule: External $WEBHOOK_PORT → $DETECTED_LOCAL_IP:$WEBHOOK_PORT"
+            echo "   4. Protocol: TCP, Enable/Active: Yes"
+            echo ""
+            echo "🧪 Verification Commands:"
+            echo "   Local test: curl -k https://$DETECTED_LOCAL_IP:$WEBHOOK_PORT"
+            echo "   Public test: curl -k https://$DETECTED_EXTERNAL_IP:$WEBHOOK_PORT"
+            echo "   Port check: nmap -p $WEBHOOK_PORT $DETECTED_EXTERNAL_IP"
             echo ""
             ;;
         "direct")
-            echo -e "${COLOR_GREEN}✅ Direct Connection (No Setup Needed)${COLOR_NC}"
-            echo "Your Pi has a direct internet connection."
-            echo "No router configuration required."
+            echo -e "${COLOR_GREEN}✅ Direct Connection Ready${COLOR_NC}"
+            echo ""
+            echo "Your Pi has a direct internet connection:"
+            echo "• No NAT/router between Pi and internet"
+            echo "• GitHub can reach Pi directly"
+            echo "• No port forwarding needed"
+            echo ""
+            echo "🧪 Quick Test:"
+            echo "   curl -k https://$DETECTED_PUBLIC_IP:$WEBHOOK_PORT"
             echo ""
             ;;
         *)
-            echo -e "${COLOR_RED}❓ Unknown Network Setup${COLOR_NC}"
-            echo "Manual network diagnosis required."
+            echo -e "${COLOR_RED}❓ Network Diagnosis Needed${COLOR_NC}"
+            echo ""
+            echo "Could not determine network setup. Possible causes:"
+            echo "• Limited internet connectivity"
+            echo "• Firewall blocking IP detection services"
+            echo "• Local/development environment"
+            echo ""
+            echo "🔍 Diagnostic Steps:"
+            echo "   1. Test connectivity: ping 8.8.8.8"
+            echo "   2. Check public IP manually: curl ifconfig.me"
+            echo "   3. Test local webhook: curl http://$DETECTED_LOCAL_IP:$WEBHOOK_PORT"
+            echo "   4. Check firewall: sudo ufw status"
             echo ""
             ;;
     esac
 
     echo "🔥 Firewall Configuration:"
-    echo "   • Check: sudo ufw status"
-    echo "   • Allow webhook: sudo ufw allow $WEBHOOK_PORT/tcp"
-    if [ "$NETWORK_SCENARIO" = "nat" ]; then
-        echo "   • Allow HTTP for Let's Encrypt: sudo ufw allow 80/tcp"
+    echo "   sudo ufw allow $WEBHOOK_PORT/tcp"
+    if [ "$HTTPS_ENABLED" = "true" ]; then
+        echo "   sudo ufw allow 80/tcp  # For Let's Encrypt validation"
     fi
     echo ""
 
-    echo "🚇 Alternative: Tunnel Services (Skip Port Forwarding)"
-    echo "   • ngrok: sudo snap install ngrok && ngrok http $WEBHOOK_PORT"
-    echo "   • Cloudflare Tunnel: cloudflared tunnel"
-    echo "   • localtunnel: npm install -g localtunnel && lt --port $WEBHOOK_PORT"
+    echo "🚇 Alternative: Tunnel Services (No Router Config Needed)"
+    echo "   ngrok:"
+    echo "     sudo snap install ngrok"
+    echo "     ngrok http $WEBHOOK_PORT"
+    echo "     Use: https://xxxxx.ngrok.io (from ngrok output)"
+    echo ""
+    echo "   Cloudflare Tunnel:"
+    echo "     curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb -o cloudflared.deb"
+    echo "     sudo dpkg -i cloudflared.deb"
+    echo "     cloudflared tunnel --url localhost:$WEBHOOK_PORT"
     echo ""
 }
 
