@@ -535,25 +535,31 @@ generate_systemd_services() {
     log_info "$context" "Using compose file: $compose_file"
     log_info "$context" "Deployment mode: ${DEPLOYMENT_MODE:-local}"
 
-    # Use Docker compatibility system to generate commands
-    local docker_compose_start_cmd=$(compose_cmd "up -d" "$compose_file")
-    local docker_compose_stop_cmd=$(compose_cmd "down" "$compose_file")
-    local docker_compose_pull_cmd=$(compose_cmd "pull" "$compose_file")
+    # Generate robust docker compose commands with full paths
+    local docker_binary="/usr/bin/docker"
+    local compose_cmd_base=""
 
-    if [ $? -ne 0 ]; then
-        log_error "$context" "Failed to generate Docker Compose commands"
-        return 1
+    # Detect available docker compose method
+    if [ "${COMPOSE_COMMAND}" = "docker compose" ]; then
+        compose_cmd_base="$docker_binary compose"
+    elif [ "${COMPOSE_COMMAND}" = "docker-compose" ]; then
+        # Check if standalone docker-compose exists
+        if command -v docker-compose >/dev/null 2>&1; then
+            compose_cmd_base="$(which docker-compose)"
+        else
+            # Fallback to docker compose plugin
+            compose_cmd_base="$docker_binary compose"
+        fi
+    else
+        # Default to docker compose plugin
+        compose_cmd_base="$docker_binary compose"
     fi
 
-    log_info "$context" "Generated Docker Compose commands using: ${COMPOSE_COMMAND}"
+    log_info "$context" "Using docker compose command: $compose_cmd_base"
+    log_info "$context" "Compose file: $compose_file"
+    log_info "$context" "Working directory: ${PROJECT_DIR}"
 
-    # For registry mode, add image pull step
-    if [ "$DEPLOYMENT_MODE" = "registry" ]; then
-        docker_compose_start_cmd="$docker_compose_pull_cmd && $docker_compose_start_cmd"
-        log_info "$context" "Registry mode: Will pull images before starting services"
-    fi
-
-    # Ruuvi Home main service
+    # Ruuvi Home main service with proper systemd patterns
     cat > "/etc/systemd/system/ruuvi-home.service" << EOF
 [Unit]
 Description=Ruuvi Home Application
@@ -561,24 +567,29 @@ Requires=docker.service
 After=docker.service network.target
 
 [Service]
-Type=forking
+Type=oneshot
 RemainAfterExit=yes
 WorkingDirectory=${PROJECT_DIR}
-ExecStart=${docker_compose_start_cmd}
-ExecStop=${docker_compose_stop_cmd}
-TimeoutStartSec=0
+ExecStartPre=${compose_cmd_base} -f ${PROJECT_DIR}/${compose_file} pull
+ExecStart=${compose_cmd_base} -f ${PROJECT_DIR}/${compose_file} up -d
+ExecStop=${compose_cmd_base} -f ${PROJECT_DIR}/${compose_file} down
+ExecReload=${compose_cmd_base} -f ${PROJECT_DIR}/${compose_file} restart
+TimeoutStartSec=300
+TimeoutStopSec=60
 User=${RUUVI_USER}
 Group=${RUUVI_USER}
+Environment=COMPOSE_PROJECT_NAME=ruuvi-home
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-    # Webhook service
+    # Webhook service with better restart and error handling
     cat > "/etc/systemd/system/ruuvi-webhook.service" << EOF
 [Unit]
 Description=Ruuvi Home Deployment Webhook
-After=network.target
+After=network.target ruuvi-home.service
+Wants=ruuvi-home.service
 
 [Service]
 Type=simple
@@ -588,6 +599,11 @@ WorkingDirectory=${PROJECT_DIR}
 ExecStart=/opt/ruuvi-home/bin/ruuvi-deploy-webhook
 Restart=always
 RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
