@@ -336,7 +336,7 @@ stop_services() {
 setup_systemd_services() {
     local context="$MODULE_CONTEXT"
     local setup_steps=(
-        "install_service_files:Install service files"
+        "generate_systemd_services:Generate service files"
         "reload_systemd_daemon:Reload systemd daemon"
         "enable_services:Enable services"
         "start_services:Start services"

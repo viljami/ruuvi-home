@@ -243,8 +243,33 @@ choose_deployment_mode() {
             # Prompt for GitHub repository if not set
             if [ -z "$GITHUB_REPO" ]; then
                 echo ""
-                read -p "Enter GitHub repository (e.g., username/ruuvi-home): " repo_input
-                export GITHUB_REPO="$repo_input"
+
+                # Try to auto-detect repository from Git remote
+                local detected_repo=""
+                if detect_repository_name 2>/dev/null; then
+                    detected_repo="$GITHUB_REPO"
+                    unset GITHUB_REPO  # Clear for user confirmation
+                fi
+
+                if [ -n "$detected_repo" ]; then
+                    echo -e "${COLOR_GREEN}Auto-detected repository: $detected_repo${COLOR_NC}"
+                    read -p "Use this repository? [Y/n]: " -n 1 -r
+                    echo
+                    if [[ $REPLY =~ ^[Nn]$ ]]; then
+                        # User declined auto-detected repo
+                        read -p "Enter GitHub repository (e.g., username/ruuvi-home): " repo_input
+                        export GITHUB_REPO="$repo_input"
+                    else
+                        # User accepted auto-detected repo (default)
+                        export GITHUB_REPO="$detected_repo"
+                        log_success "$context" "Using auto-detected repository: $GITHUB_REPO"
+                    fi
+                else
+                    # No auto-detection possible
+                    log_warn "$context" "Could not auto-detect repository from Git remote"
+                    read -p "Enter GitHub repository (e.g., username/ruuvi-home): " repo_input
+                    export GITHUB_REPO="$repo_input"
+                fi
             fi
 
             log_info "$context" "Will pull images from: $GITHUB_REGISTRY/$GITHUB_REPO"
