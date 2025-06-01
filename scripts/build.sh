@@ -302,16 +302,15 @@ build_services() {
             frontend)
                 if [ "$PARALLEL_BUILDS" = true ]; then
                     (
-                        cd frontend
-                        build_service "frontend" "../docker/frontend.Dockerfile" "." \
+                        build_service "frontend" "./docker/frontend.Dockerfile" "." \
                             "--build-arg NODE_ENV=production --build-arg GENERATE_SOURCEMAP=false"
                         echo $? > "/tmp/build_result_frontend_$$"
                     ) > "/tmp/build_log_frontend_$$" 2>&1 &
                     build_pids+=($!)
                     build_logs+=("/tmp/build_log_frontend_$$")
                 else
-                    (cd frontend && build_service "frontend" "../docker/frontend.Dockerfile" "." \
-                        "--build-arg NODE_ENV=production --build-arg GENERATE_SOURCEMAP=false")
+                    build_service "frontend" "./docker/frontend.Dockerfile" "." \
+                        "--build-arg NODE_ENV=production --build-arg GENERATE_SOURCEMAP=false"
                     build_results+=($?)
                 fi
                 ;;

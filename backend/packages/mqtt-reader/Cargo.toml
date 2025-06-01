@@ -30,19 +30,14 @@ rumqttc = "0.24"
 async-stream = "0.3.6"
 
 [dev-dependencies]
-tokio-test = "0.4"
-tempfile = "3.20"
-rstest = "0.25"
+tokio-test.workspace = true
+tempfile.workspace = true
+rstest.workspace = true
 mockall = "0.13"
-uuid = { version = "1.17", features = ["v4"] }
-sqlx = { version = "0.8.6", features = [
-  "runtime-tokio-rustls",
-  "postgres",
-  "chrono",
-  "uuid",
-] }
-testcontainers = "0.24"
-testcontainers-modules = { version = "0.12", features = ["postgres"] }
+uuid.workspace = true
+sqlx.workspace = true
+testcontainers.workspace = true
+testcontainers-modules.workspace = true
 anyhow.workspace = true
 
 [lints]

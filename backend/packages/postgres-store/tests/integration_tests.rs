@@ -10,7 +10,10 @@ use postgres_store::{
 use sqlx::Row;
 
 mod utils;
-use utils::TestDatabase;
+use utils::{
+    require_database,
+    TestDatabase,
+};
 
 fn create_test_event(sensor_mac: &str, timestamp: DateTime<Utc>) -> Event {
     Event {
@@ -34,6 +37,11 @@ fn create_test_event(sensor_mac: &str, timestamp: DateTime<Utc>) -> Event {
 
 #[tokio::test]
 async fn test_database_connection() {
+    if require_database().await.is_err() {
+        println!("Skipping test: No database available");
+        return;
+    }
+
     let test_db = TestDatabase::new()
         .await
         .expect("Failed to setup test database");
@@ -290,6 +298,7 @@ async fn test_time_bucketing() {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_sensor_statistics() {
     let test_db = TestDatabase::new()
         .await

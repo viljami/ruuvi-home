@@ -1,17 +1,39 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { renderWithoutRouter } from './test-utils';
+import App from './App';
 
-// Mock all complex dependencies to avoid test setup issues
-jest.mock('./views/Dashboard', () => () => <div data-testid="dashboard">Dashboard</div>);
-jest.mock('./views/Overview', () => () => <div data-testid="overview">Overview</div>);
-jest.mock('./views/SensorDetail', () => () => <div data-testid="sensor-detail">Sensor Detail</div>);
+// Mock the view components to avoid complex dependencies
+jest.mock('./views/Dashboard', () => {
+  return function Dashboard() {
+    return <div data-testid="dashboard">Dashboard</div>;
+  };
+});
 
-// Mock React Query completely
-jest.mock('@tanstack/react-query', () => ({
-  QueryClient: jest.fn(() => ({})),
-  QueryClientProvider: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  useQuery: jest.fn(() => ({ data: null, isLoading: false, error: null })),
+jest.mock('./views/Overview', () => {
+  return function Overview() {
+    return <div data-testid="overview">Overview</div>;
+  };
+});
+
+jest.mock('./views/SensorDetail', () => {
+  return function SensorDetail() {
+    return <div data-testid="sensor-detail">Sensor Detail</div>;
+  };
+});
+
+// Mock API calls
+jest.mock('./services/api', () => ({
+  fetchSensors: jest.fn(() => Promise.resolve([])),
+  fetchSensorData: jest.fn(() => Promise.resolve([])),
+  fetchSensorStats: jest.fn(() => Promise.resolve({
+    count: 0,
+    lastUpdate: null,
+    avgTemperature: null,
+    avgHumidity: null,
+    avgPressure: null
+  })),
 }));
 
 // Mock React Query DevTools
@@ -19,38 +41,18 @@ jest.mock('@tanstack/react-query-devtools', () => ({
   ReactQueryDevtools: () => null,
 }));
 
-// Simple App component mock that mimics the structure without complex dependencies
-const MockApp = () => {
-  return (
-    <div>
-      <header role="banner">
-        <div>
-          <span>🏠 Ruuvi Home</span>
-          <nav>
-            <button>Overview</button>
-            <button>Dashboard</button>
-          </nav>
-          <span>Sensor Monitoring Dashboard</span>
-        </div>
-      </header>
-      <main role="main">
-        <div data-testid="overview">Overview</div>
-      </main>
-    </div>
-  );
-};
-
-// Use the mock instead of the real App
-jest.mock('./App', () => MockApp);
-
 describe('App Smoke Tests', () => {
-  test('renders without crashing', () => {
-    render(<MockApp />);
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('renders without crashing', async () => {
+    renderWithoutRouter(<App />);
     expect(screen.getByText('🏠 Ruuvi Home')).toBeInTheDocument();
   });
 
-  test('displays main navigation elements', () => {
-    render(<MockApp />);
+  test('displays main navigation elements', async () => {
+    renderWithoutRouter(<App />);
     
     expect(screen.getByText('🏠 Ruuvi Home')).toBeInTheDocument();
     expect(screen.getByText('Sensor Monitoring Dashboard')).toBeInTheDocument();
@@ -58,29 +60,53 @@ describe('App Smoke Tests', () => {
     expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument();
   });
 
-  test('contains required structural elements', () => {
-    render(<MockApp />);
+  test('contains required structural elements', async () => {
+    renderWithoutRouter(<App />);
     
-    // Check that structural elements are present
     expect(screen.getByRole('banner')).toBeInTheDocument();
     expect(screen.getByRole('main')).toBeInTheDocument();
+    // Navigation buttons exist but not wrapped in nav element
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument();
   });
 
-  test('overview content is displayed by default', () => {
-    render(<MockApp />);
+  test('overview content is displayed by default', async () => {
+    renderWithoutRouter(<App />);
     
-    // Check that overview content loads
-    expect(screen.getByTestId('overview')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('overview')).toBeInTheDocument();
+    });
   });
 
-  test('basic app structure is responsive', () => {
-    render(<MockApp />);
+  test('basic app structure is responsive', async () => {
+    renderWithoutRouter(<App />);
     
-    // Verify basic responsive structure exists
     const header = screen.getByRole('banner');
     const main = screen.getByRole('main');
     
     expect(header).toBeInTheDocument();
     expect(main).toBeInTheDocument();
+  });
+
+  test('handles router context properly', async () => {
+    renderWithoutRouter(<App />);
+    
+    // Should not throw router-related errors and should render navigation buttons
+    expect(screen.getByRole('button', { name: /overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /dashboard/i })).toBeInTheDocument();
+  });
+
+  test('provides query client context', async () => {
+    renderWithoutRouter(<App />);
+    
+    // Should render components that use React Query
+    await waitFor(() => {
+      expect(screen.getByTestId('overview')).toBeInTheDocument();
+    });
+  });
+
+  test('error boundary is working', async () => {
+    // Should not crash the entire test suite
+    expect(() => renderWithoutRouter(<App />)).not.toThrow();
   });
 });

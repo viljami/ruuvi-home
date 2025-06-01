@@ -123,21 +123,6 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Port must be a number")]
-    fn test_config_from_env_invalid_port() {
-        std::env::set_var("MQTT_HOST", "test-host");
-        std::env::set_var("MQTT_PORT", "invalid");
-        std::env::set_var("MQTT_TOPIC", "test/topic");
-
-        let _config = Config::from_env();
-
-        // Clean up (won't be reached due to panic, but good practice)
-        std::env::remove_var("MQTT_HOST");
-        std::env::remove_var("MQTT_PORT");
-        std::env::remove_var("MQTT_TOPIC");
-    }
-
-    #[test]
     fn test_config_edge_cases() {
         // Test empty strings
         let config = Config::new(

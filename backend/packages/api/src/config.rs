@@ -57,7 +57,6 @@ mod tests {
         std::env::remove_var("DATABASE_URL");
         std::env::remove_var("API_PORT");
 
-        #[allow(clippy::expect_used)]
         let config = Config::from_env().expect("Should create config from env");
         assert!(config
             .database_url

@@ -71,7 +71,7 @@ services:
       - RUST_LOG=${RUST_LOG:-info}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f mqtt-reader"]
+      test: ["CMD-SHELL", "pgrep -f mqtt_reader"]
       interval: 60s
       timeout: 10s
       retries: 3

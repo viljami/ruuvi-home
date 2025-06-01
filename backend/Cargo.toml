@@ -69,3 +69,15 @@ thiserror = "2.0.12"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 clap = { version = "4.5.39", features = ["derive"] }
+uuid = { version = "1.17", features = ["v4"] }
+sqlx = { version = "0.8.6", features = [
+  "runtime-tokio-rustls",
+  "postgres",
+  "chrono",
+  "uuid",
+] }
+testcontainers = "0.24"
+testcontainers-modules = { version = "0.12", features = ["postgres"] }
+rstest = "0.25"
+tempfile = "3.20"
+tokio-test = "0.4"

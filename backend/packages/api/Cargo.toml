@@ -26,18 +26,13 @@ tower-http = { version = "0.6.4", features = ["cors"] }
 axum-test = "17.3.0"
 http-body-util = "0.1"
 tower = { version = "0.5", features = ["util"] }
-sqlx = { version = "0.8.6", features = [
-  "runtime-tokio-rustls",
-  "postgres",
-  "chrono",
-  "uuid",
-] }
-testcontainers = "0.24"
-testcontainers-modules = { version = "0.12", features = ["postgres"] }
-uuid = { version = "1.17", features = ["v4"] }
-rstest = "0.25"
-tempfile = "3.20"
-tokio-test = "0.4"
+sqlx.workspace = true
+testcontainers.workspace = true
+testcontainers-modules.workspace = true
+uuid.workspace = true
+rstest.workspace = true
+tempfile.workspace = true
+tokio-test.workspace = true
 
 [lints]
 workspace = true

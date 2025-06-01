@@ -3,10 +3,6 @@
 //! Main entry point for the REST API server that provides access to Ruuvi
 //! sensor data.
 
-// Enforce strict error handling in application code, but allow expect/unwrap in tests
-#![cfg_attr(not(test), deny(clippy::expect_used, clippy::unwrap_used))]
-#![cfg_attr(not(test), deny(clippy::panic))]
-
 use anyhow::Result;
 // Import our modular API library
 use api::{

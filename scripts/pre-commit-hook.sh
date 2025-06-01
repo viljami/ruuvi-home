@@ -25,28 +25,23 @@ check_staged_rust_files() {
         return 0
     fi
     
-    echo -e "${YELLOW}Checking staged Rust files...${NC}"
+    echo -e "${YELLOW}Checking staged Rust files using Makefile...${NC}"
     
     # Change to backend directory
     cd backend
     
-    # Quick format check
-    if ! cargo fmt --check >/dev/null 2>&1; then
-        echo -e "${RED}✗ Code formatting issues found${NC}"
-        echo -e "${YELLOW}Run 'cargo fmt' to fix formatting${NC}"
+    # Check if Makefile exists
+    if [ ! -f "Makefile" ]; then
+        echo -e "${RED}✗ Makefile not found in backend directory${NC}"
         return 1
     fi
     
-    # Quick clippy check on workspace
-    if ! cargo clippy --workspace --all-targets -- \
-        -D clippy::expect_used \
-        -D clippy::unwrap_used \
-        -D clippy::panic \
-        -A clippy::expect_used_in_tests \
-        -A clippy::unwrap_used_in_tests \
-        >/dev/null 2>&1; then
-        echo -e "${RED}✗ Clippy found issues${NC}"
-        echo -e "${YELLOW}Run './scripts/check-lints.sh' for detailed output${NC}"
+    # Run comprehensive lint checks using Makefile (MANDATORY - single source of truth)
+    if ! make lint >/dev/null 2>&1; then
+        echo -e "${RED}✗ Code quality checks failed (formatting or clippy issues)${NC}"
+        echo -e "${YELLOW}Run 'make lint' for detailed output${NC}"
+        echo -e "${YELLOW}Or run 'make fmt' to fix formatting issues${NC}"
+        echo -e "${YELLOW}NEVER use 'cargo clippy' or 'cargo fmt' directly!${NC}"
         return 1
     fi
     
@@ -119,7 +114,8 @@ main() {
     else
         echo -e "${RED}❌ Pre-commit checks failed${NC}"
         echo -e "${YELLOW}Fix the issues above before committing${NC}"
-        echo -e "${YELLOW}Or run './scripts/check-lints.sh' for more detailed analysis${NC}"
+        echo -e "${YELLOW}Run 'cd backend && make lint' for detailed analysis${NC}"
+        echo -e "${YELLOW}MANDATORY: Use Makefile targets, not direct cargo commands${NC}"
     fi
     
     exit $exit_code

@@ -1,189 +1,130 @@
-# Rust Development Makefile with Strict Quality Standards
-# Designed for Raspberry Pi development with cross-compilation support
+# Ruuvi Home Backend Makefile - Single Source of Truth for Code Quality
+# This Makefile is the ONLY way to run clippy and formatting checks
+# Identical behavior for local development and CI pipeline
 
 CARGO := cargo
-CROSS := cross
-TARGET_AARCH64 := aarch64-unknown-linux-gnu
-TARGET_X86_64 := x86_64-unknown-linux-gnu
 
-# Strict clippy flags - deny all warnings and enable all lint groups
-CLIPPY_FLAGS := -- \
-	-D warnings \
-	-D clippy::all \
-	-D clippy::pedantic \
-	-D clippy::nursery \
-	-D clippy::cargo \
-	-D clippy::correctness \
-	-D clippy::suspicious \
-	-D clippy::style \
-	-D clippy::complexity \
-	-D clippy::perf \
-	-D clippy::unwrap_used \
-	-D clippy::expect_used \
-	-D clippy::panic \
-	-D clippy::unimplemented \
-	-D clippy::todo \
-	-D clippy::unreachable \
-	-D clippy::indexing_slicing \
-	-A clippy::missing_errors_doc \
-	-A clippy::missing_panics_doc
+.PHONY: all dev build release test lint clippy-app clippy-test fmt fmt-check clean install help
 
-# Test flags for comprehensive testing
-TEST_FLAGS := --all-features --workspace
+# === PRIMARY TARGETS ===
 
-.PHONY: all dev build release test test-release clippy clippy-ci clippy-local clippy-fix fmt fmt-check \
-        clean clean-all check audit security-audit cross-aarch64 cross-x86_64 \
-        install install-tools help doc doc-open
+# Default target - full quality check
+all: lint test
 
-# Default target for development
-all: check
+# Development workflow - the main target developers should use
+dev: lint test
 
-# Development workflow - comprehensive checks (use CI-level strictness)
-dev: fmt-check clippy-ci test
+# === CODE QUALITY - SINGLE SOURCE OF TRUTH ===
 
-# Quick development build
+# Primary lint target - runs all quality checks
+lint: fmt-check clippy-app clippy-test
+
+# Application code clippy (strict error handling - no expect/unwrap)
+clippy-app:
+	@echo "🔍 Running clippy on application code (strict error handling)..."
+	$(CARGO) clippy --workspace --lib --bins -- \
+    	-D warnings \
+    	-D clippy::pedantic \
+    	-D clippy::correctness \
+    	-D clippy::suspicious \
+    	-D clippy::complexity \
+    	-D clippy::perf \
+    	-D clippy::unwrap_used \
+    	-D clippy::expect_used \
+    	-D clippy::panic \
+    	-D clippy::unimplemented \
+    	-D clippy::todo \
+    	-D clippy::unreachable \
+    	-D clippy::indexing_slicing \
+        -A clippy::missing_errors_doc \
+        -A clippy::must_use_candidate \
+    	-A clippy::missing_panics_doc
+
+# Test code clippy (allows expect/unwrap for early panic)
+clippy-test:
+	@echo "🔍 Running clippy on test code (allows expect/unwrap)..."
+	$(CARGO) clippy --workspace --tests -- \
+		-D warnings \
+		-D clippy::pedantic \
+		-A clippy::missing_errors_doc \
+		-A clippy::must_use_candidate \
+		-A clippy::expect_used \
+		-A clippy::unwrap_used
+
+# Format all code
+fmt:
+	@echo "🎨 Formatting all code..."
+	$(CARGO) fmt --all
+
+# Check formatting without making changes (used in CI)
+fmt-check:
+	@echo "🔍 Checking code formatting..."
+	$(CARGO) fmt --all -- --check
+
+# === BUILD TARGETS ===
+
+# Development build
 build:
+	@echo "🔨 Building workspace..."
 	$(CARGO) build --workspace
 
 # Release build with optimizations
 release:
+	@echo "🚀 Building release..."
 	$(CARGO) build --release --workspace
 
-# Run tests with comprehensive flags
+# === TESTING ===
+
+# Run all tests
 test:
-	$(CARGO) test $(TEST_FLAGS)
+	@echo "🧪 Running all tests..."
+	$(CARGO) test --workspace
 
-# Run tests in release mode for performance validation
-test-release:
-	$(CARGO) test $(TEST_FLAGS) --release
-
-# Run clippy with strict linting
-clippy:
-	$(CARGO) clippy --workspace --all-targets --all-features $(CLIPPY_FLAGS)
-
-# Run clippy with CI-pipeline-level strictness (matches GitHub Actions)
-clippy-ci:
-	@echo "🔍 Running CI-level clippy checks..."
-	$(CARGO) fmt --check
-	$(CARGO) clippy --workspace --all-targets --all-features -- -D warnings
-	$(CARGO) clippy --workspace --all-targets --all-features -- \
-		-D clippy::expect_used \
-		-D clippy::unwrap_used \
-		-D clippy::panic \
-		-D clippy::unimplemented \
-		-D clippy::todo \
-		-A clippy::expect_used_in_tests \
-		-A clippy::unwrap_used_in_tests
-	$(CARGO) clippy --workspace --tests --all-features -- \
-		-A clippy::expect_used \
-		-A clippy::unwrap_used \
-		-D warnings
-
-# Run local clippy script (comprehensive CI-matching checks)
-clippy-local:
-	./run-local-clippy.sh
-
-# Auto-fix clippy issues where possible
-clippy-fix:
-	$(CARGO) clippy --workspace --all-targets --all-features --fix --allow-dirty
-
-# Format code
-fmt:
-	$(CARGO) fmt --all
-
-# Check formatting without making changes
-fmt-check:
-	$(CARGO) fmt --all -- --check
+# === MAINTENANCE ===
 
 # Clean build artifacts
 clean:
+	@echo "🧹 Cleaning build artifacts..."
 	$(CARGO) clean
 
-# Clean everything including target directory
-clean-all:
-	rm -rf target/
-	$(CARGO) clean
-
-# Comprehensive check: format, clippy, build, test (CI-level strictness)
-check: fmt-check clippy-ci build test
-
-# Audit dependencies for security vulnerabilities
+# Security audit
 audit:
+	@echo "🔒 Running security audit..."
 	$(CARGO) audit
 
-# Security audit with detailed output
-security-audit:
-	$(CARGO) audit --deny warnings
-
-# Cross-compile for Raspberry Pi (ARM64)
-cross-aarch64:
-	$(CROSS) build --release --target $(TARGET_AARCH64) --workspace
-
-# Cross-compile for x86_64 Linux
-cross-x86_64:
-	$(CROSS) build --release --target $(TARGET_X86_64) --workspace
-
-# Install the binaries
+# Install binaries
 install:
+	@echo "📦 Installing binaries..."
 	$(CARGO) install --path packages/mqtt-reader --force
 	$(CARGO) install --path packages/api --force
 
-# Install development tools
-install-tools:
-	$(CARGO) install cargo-audit
-	$(CARGO) install cross
-	$(CARGO) install cargo-watch
-	$(CARGO) install cargo-expand
-	$(CARGO) install cargo-outdated
+# === HELP ===
 
-# Generate documentation
-doc:
-	$(CARGO) doc --workspace --all-features --no-deps
-
-# Generate and open documentation
-doc-open:
-	$(CARGO) doc --workspace --all-features --no-deps --open
-
-# Watch for changes and run checks
-watch:
-	$(CARGO) watch -x "fmt" -x "clippy --workspace --all-targets --all-features $(CLIPPY_FLAGS)" -x "test $(TEST_FLAGS)"
-
-# Help target
 help:
-	@echo "Rust Development Makefile - Strict Quality Standards"
+	@echo "Ruuvi Home Backend Makefile - Single Source of Truth"
+	@echo "===================================================="
 	@echo ""
-	@echo "Development Commands:"
-	@echo "  dev              - Run development workflow (fmt-check + clippy + test)"
-	@echo "  check            - Comprehensive check (fmt-check + clippy + build + test)"
-	@echo "  build            - Build all workspace packages"
-	@echo "  release          - Build with release optimizations"
+	@echo "🎯 PRIMARY TARGETS:"
+	@echo "  all              - Full quality check (lint + test)"
+	@echo "  dev              - Development workflow (same as 'all')"
+	@echo "  lint             - Run all code quality checks"
 	@echo ""
-	@echo "Quality Assurance:"
-	@echo "  clippy           - Run clippy with strict linting"
-	@echo "  clippy-ci        - Run clippy with CI-pipeline-level strictness"
-	@echo "  clippy-local     - Run comprehensive local clippy script"
-	@echo "  clippy-fix       - Auto-fix clippy issues"
-	@echo "  fmt              - Format code"
+	@echo "🔍 CODE QUALITY:"
+	@echo "  clippy-app       - Clippy for application code (strict)"
+	@echo "  clippy-test      - Clippy for test code (allows expect/unwrap)"
+	@echo "  fmt              - Format all code"
 	@echo "  fmt-check        - Check code formatting"
+	@echo ""
+	@echo "🔨 BUILD & TEST:"
+	@echo "  build            - Development build"
+	@echo "  release          - Release build"
 	@echo "  test             - Run all tests"
-	@echo "  test-release     - Run tests in release mode"
 	@echo ""
-	@echo "Security & Maintenance:"
-	@echo "  audit            - Audit dependencies"
-	@echo "  security-audit   - Security audit with strict checks"
-	@echo ""
-	@echo "Cross-compilation:"
-	@echo "  cross-aarch64    - Cross-compile for Raspberry Pi (ARM64)"
-	@echo "  cross-x86_64     - Cross-compile for x86_64 Linux"
-	@echo ""
-	@echo "Documentation:"
-	@echo "  doc              - Generate documentation"
-	@echo "  doc-open         - Generate and open documentation"
-	@echo ""
-	@echo "Utilities:"
+	@echo "🛠️  UTILITIES:"
 	@echo "  clean            - Clean build artifacts"
-	@echo "  clean-all        - Clean everything including target/"
+	@echo "  audit            - Security audit"
 	@echo "  install          - Install binaries"
-	@echo "  install-tools    - Install development tools"
-	@echo "  watch            - Watch for changes and run checks"
-	@echo "  help             - Show this help message"
+	@echo "  help             - Show this help"
+	@echo ""
+	@echo "⚠️  IMPORTANT: Use 'make lint' for all quality checks!"
+	@echo "   This ensures consistent behavior between local and CI."

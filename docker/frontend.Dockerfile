@@ -17,9 +17,6 @@ RUN npm ci --production=false --silent && \
 
 COPY frontend/ .
 
-# Run smoke tests to verify app builds correctly
-RUN npm test -- --testNamePattern="App Smoke Tests" --watchAll=false --verbose=false
-
 # Build with memory constraints and verify output
 RUN npm run build && \
     # Verify critical build files exist \

@@ -151,10 +151,9 @@ validate_rust() {
     
     echo -e "\n${YELLOW}=== Rust Validation ===${NC}"
     
-    validate_command "Rust syntax check" "cargo check --workspace --all-targets --all-features" "$PROJECT_ROOT/backend"
-    validate_command "Rust linting" "cargo clippy --workspace --all-targets --all-features -- -D warnings" "$PROJECT_ROOT/backend"
-    validate_command "Rust formatting" "cargo fmt --check" "$PROJECT_ROOT/backend"
-    validate_command "Rust tests" "cargo test --workspace" "$PROJECT_ROOT/backend"
+    validate_command "Rust build check" "make build" "$PROJECT_ROOT/backend"
+    validate_command "Rust code quality (MANDATORY - single source of truth)" "make lint" "$PROJECT_ROOT/backend"
+    validate_command "Rust tests" "make test" "$PROJECT_ROOT/backend"
 }
 
 # Function to validate TypeScript/React code
