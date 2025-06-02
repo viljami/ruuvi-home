@@ -64,6 +64,9 @@ interface DataErrorProps {
 
 // Error Boundary Component
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  private retryCount = 0;
+  private maxRetries = 3;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -94,6 +97,30 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
+    }
+
+    // Log to external service in production
+    if (process.env.NODE_ENV === 'production') {
+      // Could integrate with error reporting service here
+      console.error('Production error:', {
+        message: error.message,
+        stack: error.stack,
+        componentStack: errorInfo.componentStack,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  componentDidUpdate(prevProps: ErrorBoundaryProps) {
+    // Reset error boundary when children change (for retry scenarios)
+    if (this.state.hasError && prevProps.children !== this.props.children) {
+      this.setState({
+        hasError: false,
+        error: null,
+        errorInfo: null,
+        showDetails: false,
+      });
+      this.retryCount = 0;
     }
   }
 

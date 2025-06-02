@@ -26,17 +26,19 @@ generate_secure_passwords() {
 
     log_info "$context" "Generating secure passwords for services"
 
-    # Generate secure random passwords (32 bytes = 256 bits of entropy)
-    export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -base64 32)}"
-    export AUTH_DB_PASSWORD="${AUTH_DB_PASSWORD:-$(openssl rand -base64 32)}"
-    export MQTT_PASSWORD="${MQTT_PASSWORD:-$(openssl rand -base64 32)}"
-    export WEBHOOK_SECRET="${WEBHOOK_SECRET:-$(openssl rand -base64 32)}"
+    # Generate secure random passwords using hex encoding (URL-safe, no special characters)
+    # 32 hex chars = 128 bits of entropy (sufficient for database passwords)
+    export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-$(openssl rand -hex 32)}"
+    export AUTH_DB_PASSWORD="${AUTH_DB_PASSWORD:-$(openssl rand -hex 32)}"
+    export MQTT_PASSWORD="${MQTT_PASSWORD:-$(openssl rand -hex 32)}"
+    export WEBHOOK_SECRET="${WEBHOOK_SECRET:-$(openssl rand -hex 32)}"
 
     # Additional derived secrets (JWT requires minimum 32 characters)
-    export JWT_SECRET="${JWT_SECRET:-$(openssl rand -base64 48)}"
-    export SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -base64 32)}"
+    # 48 hex chars = 192 bits of entropy
+    export JWT_SECRET="${JWT_SECRET:-$(openssl rand -hex 48)}"
+    export SESSION_SECRET="${SESSION_SECRET:-$(openssl rand -hex 32)}"
 
-    log_success "$context" "Secure passwords generated"
+    log_success "$context" "Secure passwords generated (URL-safe hex format)"
     log_info "$context" "Passwords will be saved to .env file during setup"
 }
 

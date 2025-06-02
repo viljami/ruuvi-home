@@ -11,11 +11,30 @@ const api = axios.create({
   },
 });
 
-// Types
+// Types matching backend API
 export interface SensorReading {
   sensor_mac: string;
   gateway_mac: string;
-  timestamp: number;
+  timestamp: number; // Unix timestamp in seconds
+  temperature: number;
+  humidity: number;
+  pressure: number;
+  battery: number;
+  tx_power: number;
+  movement_counter: number;
+  measurement_sequence_number: number;
+  acceleration: number;
+  acceleration_x: number;
+  acceleration_y: number;
+  acceleration_z: number;
+  rssi: number;
+}
+
+// Backend Event type (what the API actually returns)
+interface BackendEvent {
+  sensor_mac: string;
+  gateway_mac: string;
+  timestamp: string; // ISO string from backend
   temperature: number;
   humidity: number;
   pressure: number;
@@ -40,6 +59,14 @@ export interface ApiError {
   message: string;
   status?: number;
 }
+
+// Helper function to convert backend event to frontend format
+const convertBackendEvent = (event: BackendEvent): SensorReading => {
+  return {
+    ...event,
+    timestamp: Math.floor(new Date(event.timestamp).getTime() / 1000),
+  };
+};
 
 // Helper function to handle API errors
 const handleApiError = (error: any): ApiError => {
@@ -72,11 +99,44 @@ export const apiService = {
     }
   },
 
-  // Get list of active sensors
+  // Get list of sensor MAC addresses
+  async getSensorList(): Promise<string[]> {
+    try {
+      const response: AxiosResponse<string[]> = await api.get('/api/sensors');
+      return response.data;
+    } catch (error) {
+      throw handleApiError(error);
+    }
+  },
+
+  // Get list of active sensors with their latest readings
   async getSensors(): Promise<SensorReading[]> {
     try {
-      const response: AxiosResponse<SensorReading[]> = await api.get('/api/sensors');
-      return response.data;
+      // First get the list of sensor MAC addresses
+      const sensorMacs = await this.getSensorList();
+
+      // Then fetch latest reading for each sensor
+      const promises = sensorMacs.map(async (mac) => {
+        try {
+          return await this.getLatestReading(mac);
+        } catch (error) {
+          // If a sensor fails, log but don't fail the entire request
+          console.warn(`Failed to fetch latest reading for sensor ${mac}:`, error);
+          return null;
+        }
+      });
+
+      const results = await Promise.allSettled(promises);
+
+      // Filter out failed requests and null results
+      const readings: SensorReading[] = [];
+      results.forEach((result) => {
+        if (result.status === 'fulfilled' && result.value !== null) {
+          readings.push(result.value);
+        }
+      });
+
+      return readings;
     } catch (error) {
       throw handleApiError(error);
     }
@@ -85,10 +145,10 @@ export const apiService = {
   // Get latest reading for a specific sensor
   async getLatestReading(sensorMac: string): Promise<SensorReading> {
     try {
-      const response: AxiosResponse<SensorReading> = await api.get(
+      const response: AxiosResponse<BackendEvent> = await api.get(
         `/api/sensors/${encodeURIComponent(sensorMac)}/latest`
       );
-      return response.data;
+      return convertBackendEvent(response.data);
     } catch (error) {
       throw handleApiError(error);
     }
@@ -109,8 +169,8 @@ export const apiService = {
         params.toString() ? `?${params.toString()}` : ''
       }`;
 
-      const response: AxiosResponse<SensorReading[]> = await api.get(url);
-      return response.data;
+      const response: AxiosResponse<BackendEvent[]> = await api.get(url);
+      return response.data.map(convertBackendEvent);
     } catch (error) {
       throw handleApiError(error);
     }
@@ -182,5 +242,9 @@ export const dataHelpers = {
     return 'offline';
   },
 };
+
+// Legacy exports for backward compatibility
+export const fetchSensors = apiService.getSensors;
+export const fetchSensorData = apiService.getHistoricalData;
 
 export default apiService;

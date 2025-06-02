@@ -92,6 +92,9 @@ const Overview: React.FC = () => {
     isLoading: dashboardLoading,
     error: dashboardError,
     refetchAll,
+    hasUsableData,
+    dataQuality,
+    hasPartialData,
   } = useDashboardData();
 
   const { data: allHistoryData, isLoading: historyLoading, error: historyError } = useAllSensorsHistory(timeRange);
@@ -346,7 +349,7 @@ const Overview: React.FC = () => {
     );
   }
 
-  if (dashboardError && !sensors.data) {
+  if (dashboardError && !hasUsableData) {
     return (
       <Box sx={{ maxWidth: 600, mx: 'auto', mt: 4 }}>
         <ErrorMessage
@@ -466,7 +469,7 @@ const Overview: React.FC = () => {
       </Drawer>
 
       {/* Ambient Warning Indicators */}
-      {(lowBatterySensors.length > 0 || lowSignalSensors.length > 0 || dashboardError || historyError) && (
+      {(lowBatterySensors.length > 0 || lowSignalSensors.length > 0 || (dashboardError && !hasUsableData) || historyError || hasPartialData) && (
         <Box sx={{
           position: 'fixed',
           top: 80,
@@ -474,7 +477,7 @@ const Overview: React.FC = () => {
           zIndex: 1000,
           maxWidth: 300
         }}>
-          {(dashboardError || historyError) && (
+          {(dashboardError && !hasUsableData) && (
             <Alert
               severity="error"
               variant="filled"
@@ -485,6 +488,34 @@ const Overview: React.FC = () => {
               }}
             >
               Connection issue
+            </Alert>
+          )}
+
+          {historyError && (
+            <Alert
+              severity="warning"
+              variant="filled"
+              sx={{
+                mb: 1,
+                bgcolor: alpha('#ed6c02', 0.8),
+                '& .MuiAlert-message': { fontSize: '0.875rem' }
+              }}
+            >
+              Chart data issue
+            </Alert>
+          )}
+
+          {hasPartialData && dataQuality === 'partial' && (
+            <Alert
+              severity="info"
+              variant="filled"
+              sx={{
+                mb: 1,
+                bgcolor: alpha('#0288d1', 0.8),
+                '& .MuiAlert-message': { fontSize: '0.875rem' }
+              }}
+            >
+              Some sensors unavailable
             </Alert>
           )}
 
@@ -632,7 +663,12 @@ const Overview: React.FC = () => {
           ) : (
             <Box display="flex" alignItems="center" justifyContent="center" height="100%">
               <DataError
-                message="No data available for selected time range"
+                message={!hasUsableData
+                  ? "No sensors available"
+                  : visibleSensors.size === 0
+                  ? "No sensors selected for display"
+                  : "No data available for selected time range"
+                }
                 onRetry={handleRefresh}
                 compact={false}
               />
@@ -691,20 +727,21 @@ const Overview: React.FC = () => {
       )}
 
       {/* Sensor Summary - Scrollable Overlay */}
-      <Box sx={{
-        position: 'fixed',
-        top: 120,
-        left: 16,
-        maxHeight: 'calc(100vh - 200px)',
-        maxWidth: 250,
-        overflowY: 'auto',
-        zIndex: 1000,
-        opacity: 0.1,
-        '&:hover': { opacity: 1 },
-        transition: 'opacity 0.3s ease'
-      }}>
-        {sensorData.map(sensor => (
-          <Card key={sensor.sensor_mac} sx={{
+      {hasUsableData && (
+        <Box sx={{
+          position: 'fixed',
+          top: 120,
+          left: 16,
+          maxHeight: 'calc(100vh - 200px)',
+          maxWidth: 250,
+          overflowY: 'auto',
+          zIndex: 1000,
+          opacity: 0.1,
+          '&:hover': { opacity: 1 },
+          transition: 'opacity 0.3s ease'
+        }}>
+          {sensorData.map(sensor => (
+            <Card key={sensor.sensor_mac} sx={{
             mb: 1,
             bgcolor: alpha('#1a1a1a', 0.9),
             backdropFilter: 'blur(10px)',
@@ -724,8 +761,9 @@ const Overview: React.FC = () => {
               </Box>
             </CardContent>
           </Card>
-        ))}
-      </Box>
+          ))}
+        </Box>
+      )}
     </Box>
   );
 };

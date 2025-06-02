@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import { Container, AppBar, Toolbar, Typography, Box, Button } from '@mui/material';
+import { Container, AppBar, Toolbar, Typography, Box, Button, Alert, AlertTitle } from '@mui/material';
 import Dashboard from './views/Dashboard';
 import SensorDetail from './views/SensorDetail';
 import Overview from './views/Overview';
@@ -137,54 +137,145 @@ const AppContent: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <ErrorBoundary>
+    <ErrorBoundary
+      fallback={
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Alert severity="error">
+            <AlertTitle>Application Error</AlertTitle>
+            The application encountered an unexpected error. Please refresh the page.
+          </Alert>
+        </Box>
+      }
+    >
       <Box sx={{ flexGrow: 1 }}>
         {/* App Bar */}
-        <AppBar position="static" elevation={1}>
-          <Toolbar>
-            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-              🏠 Ruuvi Home
-            </Typography>
+        <ErrorBoundary
+          fallback={
+            <AppBar position="static" elevation={1}>
+              <Toolbar>
+                <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                  🏠 Ruuvi Home
+                </Typography>
+                <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                  Navigation Error
+                </Typography>
+              </Toolbar>
+            </AppBar>
+          }
+        >
+          <AppBar position="static" elevation={1}>
+            <Toolbar>
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                🏠 Ruuvi Home
+              </Typography>
 
-            {/* Navigation Buttons */}
-            <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
-              <Button
-                color="inherit"
-                onClick={() => navigate('/')}
-                variant={location.pathname === '/' ? 'outlined' : 'text'}
-                sx={{
-                  borderColor: location.pathname === '/' ? 'rgba(255,255,255,0.5)' : 'transparent',
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
-                }}
+              {/* Navigation Buttons */}
+              <ErrorBoundary
+                fallback={
+                  <Typography variant="body2" sx={{ mr: 2, opacity: 0.6 }}>
+                    Navigation unavailable
+                  </Typography>
+                }
               >
-                Overview
-              </Button>
-              <Button
-                color="inherit"
-                onClick={() => navigate('/dashboard')}
-                variant={location.pathname === '/dashboard' ? 'outlined' : 'text'}
-                sx={{
-                  borderColor: location.pathname === '/dashboard' ? 'rgba(255,255,255,0.5)' : 'transparent',
-                  '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
-                }}
-              >
-                Dashboard
-              </Button>
-            </Box>
+                <Box sx={{ display: 'flex', gap: 1, mr: 2 }}>
+                  <Button
+                    color="inherit"
+                    onClick={() => navigate('/')}
+                    variant={location.pathname === '/' ? 'outlined' : 'text'}
+                    sx={{
+                      borderColor: location.pathname === '/' ? 'rgba(255,255,255,0.5)' : 'transparent',
+                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    }}
+                  >
+                    Overview
+                  </Button>
+                  <Button
+                    color="inherit"
+                    onClick={() => navigate('/dashboard')}
+                    variant={location.pathname === '/dashboard' ? 'outlined' : 'text'}
+                    sx={{
+                      borderColor: location.pathname === '/dashboard' ? 'rgba(255,255,255,0.5)' : 'transparent',
+                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+                    }}
+                  >
+                    Dashboard
+                  </Button>
+                </Box>
+              </ErrorBoundary>
 
-            <Typography variant="body2" sx={{ opacity: 0.8 }}>
-              Sensor Monitoring Dashboard
-            </Typography>
-          </Toolbar>
-        </AppBar>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>
+                Sensor Monitoring Dashboard
+              </Typography>
+            </Toolbar>
+          </AppBar>
+        </ErrorBoundary>
 
         {/* Main Content */}
         <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }} role="main">
-          <ErrorBoundary>
+          <ErrorBoundary
+            fallback={
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <Alert severity="error">
+                  <AlertTitle>Content Loading Error</AlertTitle>
+                  Unable to load the requested page. Please try refreshing or navigate to a different section.
+                  <Box sx={{ mt: 2 }}>
+                    <Button variant="outlined" onClick={() => navigate('/')} sx={{ mr: 1 }}>
+                      Go to Overview
+                    </Button>
+                    <Button variant="outlined" onClick={() => navigate('/dashboard')}>
+                      Go to Dashboard
+                    </Button>
+                  </Box>
+                </Alert>
+              </Box>
+            }
+          >
             <Routes>
-              <Route path="/" element={<Overview />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/sensor/:sensorId" element={<SensorDetail />} />
+              <Route
+                path="/"
+                element={
+                  <ErrorBoundary
+                    fallback={
+                      <Alert severity="error">
+                        <AlertTitle>Overview Error</AlertTitle>
+                        The overview page failed to load. Try the <Button onClick={() => navigate('/dashboard')}>Dashboard</Button> instead.
+                      </Alert>
+                    }
+                  >
+                    <Overview />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ErrorBoundary
+                    fallback={
+                      <Alert severity="error">
+                        <AlertTitle>Dashboard Error</AlertTitle>
+                        The dashboard failed to load. Try the <Button onClick={() => navigate('/')}>Overview</Button> instead.
+                      </Alert>
+                    }
+                  >
+                    <Dashboard />
+                  </ErrorBoundary>
+                }
+              />
+              <Route
+                path="/sensor/:sensorId"
+                element={
+                  <ErrorBoundary
+                    fallback={
+                      <Alert severity="error">
+                        <AlertTitle>Sensor Detail Error</AlertTitle>
+                        Unable to load sensor details. <Button onClick={() => navigate('/dashboard')}>Return to Dashboard</Button>
+                      </Alert>
+                    }
+                  >
+                    <SensorDetail />
+                  </ErrorBoundary>
+                }
+              />
             </Routes>
           </ErrorBoundary>
         </Container>
@@ -195,19 +286,30 @@ const AppContent: React.FC = () => {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Router>
-          <AppContent />
-        </Router>
+    <ErrorBoundary
+      fallback={
+        <Box sx={{ p: 3, textAlign: 'center' }}>
+          <Alert severity="error">
+            <AlertTitle>Application Error</AlertTitle>
+            The application encountered a critical error. Please refresh the page.
+          </Alert>
+        </Box>
+      }
+    >
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Router>
+            <AppContent />
+          </Router>
 
-        {/* React Query DevTools (only in development) */}
-        {process.env.NODE_ENV === 'development' && (
-          <ReactQueryDevtools initialIsOpen={false} />
-        )}
-      </ThemeProvider>
-    </QueryClientProvider>
+          {/* React Query DevTools (only in development) */}
+          {process.env.NODE_ENV === 'development' && (
+            <ReactQueryDevtools initialIsOpen={false} />
+          )}
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

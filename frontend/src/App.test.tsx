@@ -25,15 +25,39 @@ jest.mock("./views/SensorDetail", () => {
 
 // Mock the API service to return empty data
 jest.mock("./services/api", () => ({
-  fetchSensors: jest.fn(() => Promise.resolve([])),
-  fetchSensorData: jest.fn(() => Promise.resolve([])),
-  fetchSensorStats: jest.fn(() => Promise.resolve({
-    count: 0,
-    lastUpdate: null,
-    avgTemperature: null,
-    avgHumidity: null,
-    avgPressure: null
-  })),
+  apiService: {
+    checkHealth: jest.fn(() => Promise.resolve('OK')),
+    getSensorList: jest.fn(() => Promise.resolve([])),
+    getSensors: jest.fn(() => Promise.resolve([])),
+    getLatestReading: jest.fn(() => Promise.resolve({
+      sensor_mac: 'test:sensor:mac',
+      gateway_mac: 'test:gateway:mac',
+      timestamp: Math.floor(Date.now() / 1000),
+      temperature: 20.0,
+      humidity: 50.0,
+      pressure: 1013.25,
+      battery: 2800,
+      tx_power: 4,
+      movement_counter: 0,
+      measurement_sequence_number: 1,
+      acceleration: 1000,
+      acceleration_x: 0,
+      acceleration_y: 0,
+      acceleration_z: 1000,
+      rssi: -60,
+    })),
+    getHistoricalData: jest.fn(() => Promise.resolve([])),
+  },
+  dataHelpers: {
+    formatTimestamp: jest.fn((timestamp) => new Date(timestamp * 1000).toLocaleString()),
+    formatRelativeTime: jest.fn(() => 'Just now'),
+    isSensorOnline: jest.fn(() => true),
+    getTemperatureClass: jest.fn(() => 'temp-normal'),
+    getHumidityClass: jest.fn(() => 'humidity-normal'),
+    getBatteryClass: jest.fn(() => 'battery-good'),
+    formatMacAddress: jest.fn((mac) => mac.toUpperCase()),
+    getSensorStatus: jest.fn(() => 'online'),
+  },
 }));
 
 // Mock React Query DevTools

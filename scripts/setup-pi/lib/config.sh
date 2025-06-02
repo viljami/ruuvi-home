@@ -257,6 +257,12 @@ get_repository_name() {
 }
 
 # Database URL Construction
+# Generate URL-safe password using hex encoding (no special characters)
+generate_url_safe_password() {
+    local length="${1:-32}"  # Default 32 hex chars = 128 bits entropy
+    openssl rand -hex "$length"
+}
+
 construct_database_url() {
     local user="${1:-$DEFAULT_POSTGRES_USER}"
     local password="${2:-${POSTGRES_PASSWORD}}"

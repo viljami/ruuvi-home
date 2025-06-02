@@ -211,6 +211,9 @@ jobs:
       needs.detect-changes.outputs.docker == 'true' ||
       github.event_name == 'release' ||
       github.event.inputs.force_build_all == 'true')
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout code
@@ -240,11 +243,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/mqtt-reader.Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -262,6 +266,9 @@ jobs:
       needs.detect-changes.outputs.docker == 'true' ||
       github.event_name == 'release' ||
       github.event.inputs.force_build_all == 'true')
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout code
@@ -291,11 +298,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/api-server.Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -313,6 +321,9 @@ jobs:
       needs.detect-changes.outputs.docker == 'true' ||
       github.event_name == 'release' ||
       github.event.inputs.force_build_all == 'true')
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout code
@@ -342,11 +353,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/frontend.Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -364,6 +376,9 @@ jobs:
       needs.detect-changes.outputs.docker == 'true' ||
       github.event_name == 'release' ||
       github.event.inputs.force_build_all == 'true')
+    outputs:
+      image-tags: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Checkout code
@@ -393,11 +408,12 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           context: ./docker/mqtt-simulator
           file: ./docker/mqtt-simulator/Dockerfile
-          platforms: linux/arm64
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -541,7 +557,8 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-reader:latest
+          image-ref: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-reader@${{ needs.build-mqtt-reader.outputs.image-digest }}
           format: "sarif"
           output: "trivy-results-mqtt-reader.sarif"
 
@@ -568,7 +585,8 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-server:latest
+          image-ref: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-server@${{ needs.build-api-server.outputs.image-digest }}
           format: "sarif"
           output: "trivy-results-api-server.sarif"
 
@@ -595,7 +613,7 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend:latest
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend@${{ needs.build-frontend.outputs.image-digest }}
           format: "sarif"
           output: "trivy-results-frontend.sarif"
 
@@ -622,7 +640,8 @@ jobs:
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/mqtt-simulator:latest
+          image-ref: |
+            ${{env.REGISTRY}}/${{env.IMAGE_NAME}}/mqtt-simulator@${{needs.build-mqtt-simulator.outputs.image-digest}}
           format: "sarif"
           output: "trivy-results-mqtt-simulator.sarif"
 
